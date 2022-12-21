@@ -1,11 +1,11 @@
 CFLAGS=-std=c11 -g -fno-common
 CC=clang
 
-rvcc: main.o
-	$(CC) -o rvcc $(CFLAGS) main.o 
-
 test: rvcc
 	./test.sh
+
+rvcc: main.o
+	$(CC) -o rvcc $(CFLAGS) main.o 
 
 clean:
 	rm -rf rvcc *.o, *.s, tmp* a.out
