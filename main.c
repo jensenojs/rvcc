@@ -7,7 +7,6 @@
 #include <string.h>
 
 static char *currentInput;
-static int Depth;
 
 static void error(const char *fmt, ...) {
   va_list va;
@@ -96,6 +95,18 @@ static Token *tokenSkip(Token *tok, const char *expected) {
   return tok->next;
 }
 
+static bool startWith(char *str, char *substr) {
+  return strncmp(str, substr, strlen(substr)) == 0;
+}
+
+static int readPunct(char *str) {
+  if (startWith(str, "==") || startWith(str, "!=") || startWith(str, ">=") ||
+      startWith(str, "<=")) {
+    return 2;
+  }
+  return ispunct(*str) ? 1 : 0;
+}
+
 // lexical analysis
 static Token *tokenize() {
   Token head = {}; // empty head
@@ -118,10 +129,15 @@ static Token *tokenize() {
       continue;
     }
 
-    if (ispunct(*p)) {
-      cur->next = newToken(TK_PUNCT, p, p + 1);
+    int punctLen = readPunct(p);
+    if (punctLen) {
+      // I'm not sure, but clang seems to have some inconsistencies with my
+      // understanding of arithmetic operations on pointers
+      // newToken(TK_PUNCT, p, p + punctLen); is not right when punctLen is 2
+      cur->next = newToken(TK_PUNCT, p, p + punctLen);
       cur = cur->next;
-      ++p;
+      // cur->len = punctLen;
+      p += punctLen; 
       continue;
     }
 
@@ -153,9 +169,13 @@ typedef enum {
   ND_MUL, // *
   ND_DIV, // /
 
-  ND_NEG, //
-
+  ND_NEG, // negative number
   ND_NUM, // int
+
+  ND_EQ, // ==
+  ND_NE, // !=
+  ND_LT, // < (or >)
+  ND_LE, // <= (or >=)
 } NodeType;
 
 typedef struct Node {
@@ -190,8 +210,20 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
   return d;
 }
 
-// expr = mul ( "+" mul | "-" mul ) *
+// Each function represents a generating rule
+// The higher the priority the execution rule is the lower in the AST tree.
+
+// expr = equality
 static Node *expr(Token **rest, Token *tok);
+
+// equality = relational ( "==" ralational | "!=" ralational) *
+static Node *equality(Token **rest, Token *tok);
+
+// relational = add ( "<" add | "<=" add | ">" add | ">=" add) *
+static Node *relational(Token **rest, Token *tok);
+
+// add = mul ("+" mul | "-" mul) *
+static Node *add(Token **rest, Token *tok);
 
 // mul = unary ("*" unary | "/" unary) *
 static Node *mul(Token **rest, Token *tok);
@@ -202,21 +234,20 @@ static Node *unary(Token **rest, Token *tok);
 // primary = "(" expr ")" | num
 static Node *primary(Token **rest, Token *tok);
 
-static Node *expr(Token **rest, Token *tok) {
-  Node *d = mul(&tok, tok);
+static Node *expr(Token **rest, Token *tok) { return equality(rest, tok); }
 
-  // ( "+" mul | "-" mul ) *
+static Node *equality(Token **rest, Token *tok) {
+  Node *d = relational(&tok, tok);
+
   while (true) {
-    if (tokenCompare(tok, "+")) {
-      d = newBinary(ND_ADD, d, mul(&tok, tok->next));
+    if (tokenCompare(tok, "==")) {
+      d = newBinary(ND_EQ, d, relational(&tok, tok->next));
       continue;
     }
-
-    if (tokenCompare(tok, "-")) {
-      d = newBinary(ND_SUB, d, mul(&tok, tok->next));
+    if (tokenCompare(tok, "!=")) {
+      d = newBinary(ND_NE, d, relational(&tok, tok->next));
       continue;
     }
-
     break;
   }
 
@@ -224,11 +255,54 @@ static Node *expr(Token **rest, Token *tok) {
   return d;
 }
 
+static Node *relational(Token **rest, Token *tok) {
+  Node *d = add(&tok, tok);
+
+  while (true) {
+    if (tokenCompare(tok, "<")) {
+      d = newBinary(ND_LT, d, relational(&tok, tok->next));
+      continue;
+    }
+    if (tokenCompare(tok, "<=")) {
+      d = newBinary(ND_LE, d, relational(&tok, tok->next));
+      continue;
+    }
+    if (tokenCompare(tok, ">")) {
+      d = newBinary(ND_LT, relational(&tok, tok->next), d);
+      continue;
+    }
+    if (tokenCompare(tok, ">=")) {
+      d = newBinary(ND_LE, relational(&tok, tok->next), d);
+      continue;
+    }
+    break;
+  }
+
+  *rest = tok;
+  return d;
+}
+
+static Node *add(Token **rest, Token *tok) {
+  Node *d = mul(&tok, tok);
+
+  while (true) {
+    if (tokenCompare(tok, "+")) {
+      d = newBinary(ND_ADD, d, mul(&tok, tok->next));
+      continue;
+    }
+    if (tokenCompare(tok, "-")) {
+      d = newBinary(ND_SUB, d, mul(&tok, tok->next));
+      continue;
+    }
+    break;
+  }
+  *rest = tok;
+  return d;
+}
+
 static Node *mul(Token **rest, Token *tok) {
-  // unary
   Node *d = unary(&tok, tok);
 
-  // ("*" unary | "/" unary) *
   while (true) {
     if (tokenCompare(tok, "*")) {
       d = newBinary(ND_MUL, d, unary(&tok, tok->next));
@@ -247,7 +321,6 @@ static Node *mul(Token **rest, Token *tok) {
   return d;
 }
 
-// unary = ( "+" | "-" ) unary | primary
 static Node *unary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "+"))
     return unary(rest, tok->next);
@@ -257,14 +330,12 @@ static Node *unary(Token **rest, Token *tok) {
 }
 
 static Node *primary(Token **rest, Token *tok) {
-  // "(" expr ")"
   if (tokenCompare(tok, "(")) {
     Node *d = expr(&tok, tok->next);
     *rest = tokenSkip(tok, ")");
     return d;
   }
 
-  // num
   if (tok->type == TK_NUM) {
     Node *d = newNum(tok->val);
     *rest = tok->next;
@@ -278,6 +349,8 @@ static Node *primary(Token **rest, Token *tok) {
 /*
  *  Semantic analysis and code generation
  */
+
+// mark current stack depth
 static int StackDepth;
 
 // push the value of a0 onto the stack
@@ -333,6 +406,33 @@ static void genExpr(Node *node) {
   case ND_DIV:
     printf("  div a0, a0, a1\n");
     return;
+  case ND_EQ:
+  case ND_NE:
+    // first compare the two values to see if they are equal
+    printf("  xor a0, a0, a1\n");
+
+    // then base on condition to set 1 or 0 to reg
+    if (node->type == ND_EQ)
+      // Set if Equal to Zero (rd, rs1)
+      // if x[rd] == 0, then write 1 to x[rs1] otherwise 0
+      printf("  seqz a0, a0\n");
+    else
+      // Set if not Equal to Zero (rd, rs2)
+      // if x[rd] != 0, then write 1 to x[rs1] otherwise 0
+      printf("  snez a0, a0\n");
+    return;
+  case ND_LT:
+    // Set if Less Than (rs, rs1, rs2)
+    // compare x[rs1], x[rs2], if x[rs1] < x[rs2], then write 1 to rs, otherwise
+    // 0
+    printf("  slt a0, a0, a1\n");
+    return;
+  case ND_LE:
+    // a0 <= a1 <==> a0 = a1 < a0, a0 = a1^1
+
+    printf("  slt a0, a1, a0\n");
+    printf("  xori a0, a0, 1\n");
+    return;
   default:
     break;
   }
@@ -360,7 +460,7 @@ int main(int argc, char **argv) {
   // ret is alias for "jalr x0, x1, 0"
   printf("  ret\n");
 
-  assert(Depth == 0);
+  assert(StackDepth == 0);
 
   return 0;
 }
