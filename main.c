@@ -147,10 +147,14 @@ static int getNumber(Token *tok) {
 
 typedef enum {
   ND_INVALID = 0,
+
   ND_ADD, // +
   ND_SUB, // -
   ND_MUL, // *
   ND_DIV, // /
+
+  ND_NEG, //
+
   ND_NUM, // int
 } NodeType;
 
@@ -173,6 +177,12 @@ static Node *newNum(int val) {
   return d;
 }
 
+static Node *newUnary(NodeType type, Node *expr) {
+  Node *d = newNode(type);
+  d->left = expr;
+  return d;
+}
+
 static Node *newBinary(NodeType type, Node *left, Node *right) {
   Node *d = newNode(type);
   d->left = left;
@@ -183,8 +193,11 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 // expr = mul ( "+" mul | "-" mul ) *
 static Node *expr(Token **rest, Token *tok);
 
-// mul = primary ("*" primary | "/" primary) *
+// mul = unary ("*" unary | "/" unary) *
 static Node *mul(Token **rest, Token *tok);
+
+// unary = ( "+" | "-" ) unary | primary
+static Node *unary(Token **rest, Token *tok);
 
 // primary = "(" expr ")" | num
 static Node *primary(Token **rest, Token *tok);
@@ -212,18 +225,18 @@ static Node *expr(Token **rest, Token *tok) {
 }
 
 static Node *mul(Token **rest, Token *tok) {
-  // primary
-  Node *d = primary(&tok, tok);
+  // unary
+  Node *d = unary(&tok, tok);
 
-  // ("*" primary | "/" primary) *
+  // ("*" unary | "/" unary) *
   while (true) {
     if (tokenCompare(tok, "*")) {
-      d = newBinary(ND_MUL, d, primary(&tok, tok->next));
+      d = newBinary(ND_MUL, d, unary(&tok, tok->next));
       continue;
     }
 
     if (tokenCompare(tok, "/")) {
-      d = newBinary(ND_DIV, d, primary(&tok, tok->next));
+      d = newBinary(ND_DIV, d, unary(&tok, tok->next));
       continue;
     }
 
@@ -232,6 +245,15 @@ static Node *mul(Token **rest, Token *tok) {
 
   *rest = tok;
   return d;
+}
+
+// unary = ( "+" | "-" ) unary | primary
+static Node *unary(Token **rest, Token *tok) {
+  if (tokenCompare(tok, "+"))
+    return unary(rest, tok->next);
+  if (tokenCompare(tok, "-"))
+    return newUnary(ND_NEG, unary(rest, tok->next));
+  return primary(rest, tok);
 }
 
 static Node *primary(Token **rest, Token *tok) {
@@ -277,10 +299,18 @@ static void pop(char *reg) {
 
 // traversing the AST tree to generate assembly code
 static void genExpr(Node *node) {
+
   // load data to a0 register
-  if (node->type == ND_NUM) {
+  switch (node->type) {
+  case ND_NUM:
     printf("  li a0, %d\n", node->val);
     return;
+  case ND_NEG:
+    genExpr(node->left);
+    printf("  neg a0, a0\n");
+    return;
+  default:
+    break;
   }
 
   // consider the priority, recurse to the right node first
