@@ -34,6 +34,13 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 // Each function represents a generating rule
 // The higher the priority the execution rule is the lower in the AST tree.
 
+// program = stmt*
+
+// stmt = exprStmt
+
+// exprStmt = expr ";"
+static Node *exprStmt(Token **rest, Token *tok);
+
 // expr = equality
 static Node *expr(Token **rest, Token *tok);
 
@@ -56,6 +63,14 @@ static Node *unary(Token **rest, Token *tok);
 static Node *primary(Token **rest, Token *tok);
 
 // =================================================================
+
+static Node *stmt(Token **rest, Token *tok) { return exprStmt(rest, tok); }
+
+static Node *exprStmt(Token **rest, Token *tok) {
+  Node *d = newUnary(ND_EXPR_STMT, expr(&tok, tok));
+  *rest = tokenSkip(tok, ";");
+  return d;
+}
 
 static Node *expr(Token **rest, Token *tok) { return equality(rest, tok); }
 
@@ -170,8 +185,11 @@ static Node *primary(Token **rest, Token *tok) {
 }
 
 Node *parse(Token *tok) {
-  Node *d = expr(&tok, tok);
-  if (tok->type != TK_EOF)
-    errorTok(tok, "extra token!");
-  return d;
+  Node head = {};
+  Node *cur = &head;
+  while (tok->type != TK_EOF) {
+    cur->next = stmt(&tok, tok);
+    cur = cur->next;
+  }
+  return head.next;
 }

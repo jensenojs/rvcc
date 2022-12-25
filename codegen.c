@@ -93,12 +93,22 @@ static void genExpr(Node *node) {
   error("invalid expression");
 }
 
+static void genStmt(Node *node) {
+  if (node->type == ND_EXPR_STMT) {
+    genExpr(node->left);
+    return;
+  }
+  error("invalid expression");
+}
+
 void codegen(Node *node) {
   printf("  .global main\n");
   printf("main:\n");
 
-  genExpr(node);
-  printf("  ret\n");
+  for (Node *d = node; d; d = d->next) {
+    genStmt(node);
+    assert(StackDepth == 0);
+  }
 
-  assert(StackDepth == 0);
+  printf("  ret\n");
 }

@@ -46,10 +46,13 @@ typedef enum {
   ND_NE, // !=
   ND_LT, // < (or >)
   ND_LE, // <= (or >=)
+
+  ND_EXPR_STMT, // Expression Statements
 } NodeType;
 
 typedef struct Node {
   NodeType type;
+  struct Node *next; // Referring to the next statement
   struct Node *left;
   struct Node *right;
   int val;
