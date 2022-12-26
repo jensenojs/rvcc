@@ -66,4 +66,11 @@ assert 1 '0*9+5*2==4+4*(6/3)-2;'
 
 #[9]  支持 ; 分割语句
 
+# [10] 支持单字母变量
+assert 3 'a=3; a;'
+assert 5 'a=3; z=5; z;'
+assert 8 'a=3; z=5; a+z;'
+assert 6 'a=b=3; a+b;'
+assert 5 'a=3;b=4;a=1;a+b;'
+
 echo OK

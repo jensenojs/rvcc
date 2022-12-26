@@ -13,22 +13,28 @@ static Node *newNode(NodeType type) {
 }
 
 static Node *newNum(int val) {
-  Node *d = newNode(ND_NUM);
-  d->val = val;
-  return d;
+  Node *node = newNode(ND_NUM);
+  node->val = val;
+  return node;
 }
 
 static Node *newUnary(NodeType type, Node *expr) {
-  Node *d = newNode(type);
-  d->left = expr;
-  return d;
+  Node *node = newNode(type);
+  node->left = expr;
+  return node;
+}
+
+static Node *newVarNode(char Name) {
+  Node *node = newNode(ND_VAR);
+  node->name = Name;
+  return node;
 }
 
 static Node *newBinary(NodeType type, Node *left, Node *right) {
-  Node *d = newNode(type);
-  d->left = left;
-  d->right = right;
-  return d;
+  Node *node = newNode(type);
+  node->left = left;
+  node->right = right;
+  return node;
 }
 
 // Each function represents a generating rule
@@ -41,8 +47,11 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 // exprStmt = expr ";"
 static Node *exprStmt(Token **rest, Token *tok);
 
-// expr = equality
+// expr = assign
 static Node *expr(Token **rest, Token *tok);
+
+// assign = equality ("=" assign)?
+static Node *assign(Token **rest, Token *tok);
 
 // equality = relational ( "==" ralational | "!=" ralational) *
 static Node *equality(Token **rest, Token *tok);
@@ -59,96 +68,106 @@ static Node *mul(Token **rest, Token *tok);
 // unary = ( "+" | "-" ) unary | primary
 static Node *unary(Token **rest, Token *tok);
 
-// primary = "(" expr ")" | num
+// primary = "(" expr ")" | num | ident(variable)
 static Node *primary(Token **rest, Token *tok);
 
 // =================================================================
 
-static Node *stmt(Token **rest, Token *tok) { return exprStmt(rest, tok); }
+Node *stmt(Token **rest, Token *tok) { return exprStmt(rest, tok); }
 
-static Node *exprStmt(Token **rest, Token *tok) {
-  Node *d = newUnary(ND_EXPR_STMT, expr(&tok, tok));
+Node *exprStmt(Token **rest, Token *tok) {
+  Node *node = newUnary(ND_EXPR_STMT, expr(&tok, tok));
   *rest = tokenSkip(tok, ";");
-  return d;
+  return node;
 }
 
-static Node *expr(Token **rest, Token *tok) { return equality(rest, tok); }
+Node *expr(Token **rest, Token *tok) { return assign(rest, tok); }
 
-static Node *equality(Token **rest, Token *tok) {
-  Node *d = relational(&tok, tok);
+Node *assign(Token **rest, Token *tok) {
+  Node *node = equality(&tok, tok);
+
+  if (tokenCompare(tok, "="))
+    node = newBinary(ND_ASSIGN, node, assign(&tok, tok->next));
+
+  *rest = tok;
+  return node;
+}
+
+Node *equality(Token **rest, Token *tok) {
+  Node *node = relational(&tok, tok);
 
   while (true) {
     if (tokenCompare(tok, "==")) {
-      d = newBinary(ND_EQ, d, relational(&tok, tok->next));
+      node = newBinary(ND_EQ, node, relational(&tok, tok->next));
       continue;
     }
     if (tokenCompare(tok, "!=")) {
-      d = newBinary(ND_NE, d, relational(&tok, tok->next));
+      node = newBinary(ND_NE, node, relational(&tok, tok->next));
       continue;
     }
     break;
   }
 
   *rest = tok;
-  return d;
+  return node;
 }
 
-static Node *relational(Token **rest, Token *tok) {
-  Node *d = add(&tok, tok);
+Node *relational(Token **rest, Token *tok) {
+  Node *node = add(&tok, tok);
 
   while (true) {
     if (tokenCompare(tok, "<")) {
-      d = newBinary(ND_LT, d, relational(&tok, tok->next));
+      node = newBinary(ND_LT, node, relational(&tok, tok->next));
       continue;
     }
     if (tokenCompare(tok, "<=")) {
-      d = newBinary(ND_LE, d, relational(&tok, tok->next));
+      node = newBinary(ND_LE, node, relational(&tok, tok->next));
       continue;
     }
     if (tokenCompare(tok, ">")) {
-      d = newBinary(ND_LT, relational(&tok, tok->next), d);
+      node = newBinary(ND_LT, relational(&tok, tok->next), node);
       continue;
     }
     if (tokenCompare(tok, ">=")) {
-      d = newBinary(ND_LE, relational(&tok, tok->next), d);
+      node = newBinary(ND_LE, relational(&tok, tok->next), node);
       continue;
     }
     break;
   }
 
   *rest = tok;
-  return d;
+  return node;
 }
 
-static Node *add(Token **rest, Token *tok) {
-  Node *d = mul(&tok, tok);
+Node *add(Token **rest, Token *tok) {
+  Node *node = mul(&tok, tok);
 
   while (true) {
     if (tokenCompare(tok, "+")) {
-      d = newBinary(ND_ADD, d, mul(&tok, tok->next));
+      node = newBinary(ND_ADD, node, mul(&tok, tok->next));
       continue;
     }
     if (tokenCompare(tok, "-")) {
-      d = newBinary(ND_SUB, d, mul(&tok, tok->next));
+      node = newBinary(ND_SUB, node, mul(&tok, tok->next));
       continue;
     }
     break;
   }
   *rest = tok;
-  return d;
+  return node;
 }
 
-static Node *mul(Token **rest, Token *tok) {
-  Node *d = unary(&tok, tok);
+Node *mul(Token **rest, Token *tok) {
+  Node *node = unary(&tok, tok);
 
   while (true) {
     if (tokenCompare(tok, "*")) {
-      d = newBinary(ND_MUL, d, unary(&tok, tok->next));
+      node = newBinary(ND_MUL, node, unary(&tok, tok->next));
       continue;
     }
 
     if (tokenCompare(tok, "/")) {
-      d = newBinary(ND_DIV, d, unary(&tok, tok->next));
+      node = newBinary(ND_DIV, node, unary(&tok, tok->next));
       continue;
     }
 
@@ -156,10 +175,10 @@ static Node *mul(Token **rest, Token *tok) {
   }
 
   *rest = tok;
-  return d;
+  return node;
 }
 
-static Node *unary(Token **rest, Token *tok) {
+Node *unary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "+"))
     return unary(rest, tok->next);
   if (tokenCompare(tok, "-"))
@@ -167,17 +186,23 @@ static Node *unary(Token **rest, Token *tok) {
   return primary(rest, tok);
 }
 
-static Node *primary(Token **rest, Token *tok) {
+Node *primary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "(")) {
-    Node *d = expr(&tok, tok->next);
+    Node *node = expr(&tok, tok->next);
     *rest = tokenSkip(tok, ")");
-    return d;
+    return node;
+  }
+
+  if (tok->type == TK_INDET) {
+    Node *node = newVarNode(*tok->idx);
+    *rest = tok->next;
+    return node;
   }
 
   if (tok->type == TK_NUM) {
-    Node *d = newNum(tok->val);
+    Node *node = newNum(tok->val);
     *rest = tok->next;
-    return d;
+    return node;
   }
 
   errorTok(tok, "invalid expression");

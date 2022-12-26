@@ -9,6 +9,7 @@
 // token for parsing
 typedef enum {
   TK_INVALID = 0,
+  TK_INDET, // mark for variable name and function name
   TK_PUNCT,
   TK_NUM,
   TK_EOF,
@@ -47,6 +48,9 @@ typedef enum {
   ND_LT, // < (or >)
   ND_LE, // <= (or >=)
 
+  ND_ASSIGN,
+  ND_VAR, // variable
+
   ND_EXPR_STMT, // Expression Statements
 } NodeType;
 
@@ -55,7 +59,8 @@ typedef struct Node {
   struct Node *next; // Referring to the next statement
   struct Node *left;
   struct Node *right;
-  int val;
+  int val;   // store ND_NUM
+  char name; // store ND_VAR
 } Node;
 
 // Syntax parsing entry

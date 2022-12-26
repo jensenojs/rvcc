@@ -104,6 +104,14 @@ Token *tokenize(char *p) {
       continue;
     }
 
+    // parse INDET
+    if ('a' <= *p && *p <= 'z') {
+      cur->next = newToken(TK_INDET, p, p + 1);
+      cur = cur->next;
+      ++p;
+      continue;
+    }
+
     int punctLen = readPunct(p);
     if (punctLen) {
       // I'm not sure, but clang seems to have some inconsistencies with my

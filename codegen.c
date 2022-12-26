@@ -11,16 +11,27 @@ static void push() {
   //  sp is the stack pointer, the stack grows downwards, under 64
   //  bits, 8 bytes is a unit, so sp-8
   printf("  addi sp, sp, -8\n");
-  //  press the value of a0 onto the stack
+  // sd rs2, offset(rs1)  M[x[rs1] + sext(offset) = x[rs2][63: 0]
   printf("  sd a0, 0(sp)\n");
   StackDepth++;
 }
 
 // pop the value of the address pointed to by sp into the register
 static void pop(char *reg) {
+  // ld rd, offset(rs1) x[rd] = M[x[rs1] + sext(offset)][63:0]
   printf("  ld %s, 0(sp)\n", reg);
   printf("  addi sp, sp, 8\n");
   StackDepth--;
+}
+
+static void genAddr(Node *node) {
+  if (node->type == ND_VAR) {
+    int offSet = (node->name - 'a' + 1) * 8;
+    printf("  addi a0, fp, %d\n",
+           -offSet); // fp is frame pointer, also named as x8, s0
+    return;
+  }
+  error("not an lvalue");
 }
 
 // traversing the AST tree to generate assembly code
@@ -34,6 +45,21 @@ static void genExpr(Node *node) {
   case ND_NEG:
     genExpr(node->left);
     printf("  neg a0, a0\n");
+    return;
+  case ND_VAR:
+    // calculate the address of the variable and store into a0
+    genAddr(node);
+    // the data stored in the a0 address is accessed and stored in the a0
+    // address
+    printf("  ld a0, 0(a0)\n");
+    return;
+  case ND_ASSIGN:
+    // left
+    genAddr(node->left);
+    push();
+    genExpr(node->right);
+    pop("a1");
+    printf("  sd a0, 0(a1)\n"); // assign
     return;
   default:
     break;
@@ -104,11 +130,41 @@ static void genStmt(Node *node) {
 void codegen(Node *node) {
   printf("  .global main\n");
   printf("main:\n");
+  // stack layout
+  //-------------------------------// sp
+  //              fp                  fp = sp-8
+  //-------------------------------// fp
+  //              'a'                 fp-8
+  //              'b'                 fp-16
+  //              ...
+  //              'z'                 fp-208
+  //-------------------------------// sp=sp-8-208
+  //     Expression evaluation
+  //-------------------------------//
 
-  for (Node *d = node; d; d = d->next) {
-    genStmt(node);
+  // prologue
+
+  // push fp onto the stack, preserving the value of fp
+  printf("  addi sp, sp, -8\n");
+  printf("  sd fp, 0(sp)\n");
+  // write sp to fp
+  printf("  mv fp, sp\n");
+
+  // 26 * 8 = 208, save those memory to store value of a single-letter variable
+  printf("  addi sp, sp, -208\n");
+
+  for (Node *each = node; each; each = each->next) {
+    genStmt(each);
     assert(StackDepth == 0);
   }
+
+  // epilogue
+
+  // write fp to sp
+  printf("  mv sp, fp\n");
+  // pop the stack of the earliest fp saved values and restore fp.
+  printf("  ld fp, 0(sp)\n");
+  printf("  addi sp, sp, 8\n");
 
   printf("  ret\n");
 }
