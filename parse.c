@@ -1,4 +1,27 @@
 #include "rvcc.h"
+#include <stdlib.h>
+
+// during parsing, all variable instances are added to this list
+static Obj *Locals;
+
+// new a var
+static Obj *newLVar(char *name) {
+  Obj *var = calloc(1, sizeof(Obj));
+  var->name = name;
+  var->next = Locals;
+  Locals = var;
+  return var;
+}
+
+// find a var by its name, if not found, returns NULL
+static Obj *findVar(Token *tok) {
+  for (Obj *o = Locals; o; o = o->next) {
+    if (strlen(o->name) == tok->len && !strncmp(tok->idx, o->name, tok->len)) {
+      return o;
+    }
+  }
+  return NULL;
+}
 
 /*
  * Generate AST (Abstract Syntax Tree), syntax analysis
@@ -6,6 +29,8 @@
  * like (), *, /
  */
 
+// Those below are the types of AST node, newNode is a helper function to
+// generate different types of nodes.
 static Node *newNode(NodeType type) {
   Node *d = calloc(1, sizeof(Node));
   d->type = type;
@@ -24,9 +49,9 @@ static Node *newUnary(NodeType type, Node *expr) {
   return node;
 }
 
-static Node *newVarNode(char Name) {
+static Node *newVarNode(Obj *var) {
   Node *node = newNode(ND_VAR);
-  node->name = Name;
+  node->var = var;
   return node;
 }
 
@@ -193,10 +218,12 @@ Node *primary(Token **rest, Token *tok) {
     return node;
   }
 
-  if (tok->type == TK_INDET) {
-    Node *node = newVarNode(*tok->idx);
+  if (tok->type == TK_IDENT) {
+    Obj *var = findVar(tok);
+    if (!var)
+      var = newLVar(strndup(tok->idx, tok->len));
     *rest = tok->next;
-    return node;
+    return newVarNode(var);
   }
 
   if (tok->type == TK_NUM) {
@@ -209,12 +236,20 @@ Node *primary(Token **rest, Token *tok) {
   return NULL;
 }
 
-Node *parse(Token *tok) {
+Function *parse(Token *tok) {
   Node head = {};
   Node *cur = &head;
+
   while (tok->type != TK_EOF) {
     cur->next = stmt(&tok, tok);
     cur = cur->next;
   }
-  return head.next;
+
+  // The function body stores the AST of the statement, and Locals stores the
+  // variables
+  Function *program = calloc(1, sizeof(Function));
+  program->body = head.next;
+  program->locals = Locals;
+
+  return program;
 }

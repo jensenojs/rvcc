@@ -1,3 +1,7 @@
+// POSIX.1标准
+// 使用了strndup函数
+#define _POSIX_C_SOURCE 200809L
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -9,7 +13,7 @@
 // token for parsing
 typedef enum {
   TK_INVALID = 0,
-  TK_INDET, // mark for variable name and function name
+  TK_IDENT, // mark for variable name and function name
   TK_PUNCT,
   TK_NUM,
   TK_EOF,
@@ -30,6 +34,13 @@ Token *tokenSkip(Token *tok, const char *expected);
 void error(const char *fmt, ...);
 void errorAt(char *idx, char *fmt, ...);
 void errorTok(Token *tok, char *fmt, ...);
+
+// local variable
+typedef struct Obj {
+  struct Obj *next;
+  char *name;
+  int offSet; // the offset of fp
+} Obj;
 
 // Types of Nodes for AST
 typedef enum {
@@ -54,20 +65,29 @@ typedef enum {
   ND_EXPR_STMT, // Expression Statements
 } NodeType;
 
+// AST tree node
 typedef struct Node {
   NodeType type;
   struct Node *next; // Referring to the next statement
   struct Node *left;
   struct Node *right;
-  int val;   // store ND_NUM
-  char name; // store ND_VAR
+
+  int val;  // store ND_NUM if needed
+  Obj *var; // store ND_VAR if needed
 } Node;
+
+// function
+typedef struct Function {
+  Node *body;
+  Obj *locals;
+  int stackSize;
+} Function;
 
 // Syntax parsing entry
 Token *tokenize();
 
 // Semantic analysis and code entry
-Node *parse(Token *Tok);
+Function *parse(Token *Tok);
 
 // Code Generation entry
-void codegen(Node *node);
+void codegen(Function *prog);

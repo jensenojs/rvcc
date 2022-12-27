@@ -24,11 +24,15 @@ static void pop(char *reg) {
   StackDepth--;
 }
 
+static int alighTo(int n, int align) {
+  // (0, align] -> align
+  return (n + align - 1) / align * align;
+}
+// offset is relative to fp
 static void genAddr(Node *node) {
   if (node->type == ND_VAR) {
-    int offSet = (node->name - 'a' + 1) * 8;
     printf("  addi a0, fp, %d\n",
-           -offSet); // fp is frame pointer, also named as x8, s0
+           node->var->offSet); // fp is frame pointer, also named as x8, s0
     return;
   }
   error("not an lvalue");
@@ -127,18 +131,28 @@ static void genStmt(Node *node) {
   error("invalid expression");
 }
 
-void codegen(Node *node) {
+// Calculate the offset from the variable's linked list
+static void assignLVarOffset(Function *prog) {
+  int offset = 0;
+  for (Obj *var = prog->locals; var; var = var->next) {
+    offset += 8;
+    var->offSet = -offset;
+    prog->stackSize = alighTo(offset, 16); //
+  }
+}
+
+// code generation entry function, containing the base information of the code
+// block
+void codegen(Function *prog) {
+  assignLVarOffset(prog);
   printf("  .global main\n");
   printf("main:\n");
   // stack layout
   //-------------------------------// sp
   //              fp                  fp = sp-8
   //-------------------------------// fp
-  //              'a'                 fp-8
-  //              'b'                 fp-16
-  //              ...
-  //              'z'                 fp-208
-  //-------------------------------// sp=sp-8-208
+  //           variable            //
+  //-------------------------------// sp=sp-8-StackSize
   //     Expression evaluation
   //-------------------------------//
 
@@ -150,10 +164,10 @@ void codegen(Node *node) {
   // write sp to fp
   printf("  mv fp, sp\n");
 
-  // 26 * 8 = 208, save those memory to store value of a single-letter variable
-  printf("  addi sp, sp, -208\n");
+  // the offset is the size of the stack used by the actual variable
+  printf("  addi sp, sp, -%d\n", prog->stackSize);
 
-  for (Node *each = node; each; each = each->next) {
+  for (Node *each = prog->body; each; each = each->next) {
     genStmt(each);
     assert(StackDepth == 0);
   }

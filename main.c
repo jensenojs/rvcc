@@ -9,10 +9,10 @@ int main(int argc, char **argv) {
   Token *tok = tokenize(argv[1]);
 
   // parse the stream of tokens
-  Node *node = parse(tok);
+  Function *prog = parse(tok);
 
   // codegen
-  codegen(node);
+  codegen(prog);
 
   return 0;
 }

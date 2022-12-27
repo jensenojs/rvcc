@@ -82,6 +82,16 @@ static int readPunct(char *str) {
   return ispunct(*str) ? 1 : 0;
 }
 
+// rules for determining the initial letter of a ident
+// [a-zA-Z_]
+static bool isIdent1(char c) {
+  return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
+}
+
+// rules for determining the initial letter of a ident
+// [a-zA-Z_]
+static bool isIdent2(char c) { return isIdent1(c) || ('0' <= c && c <= '9'); }
+
 // lexical analysis
 Token *tokenize(char *p) {
   currentInput = p;
@@ -105,10 +115,13 @@ Token *tokenize(char *p) {
     }
 
     // parse INDET
-    if ('a' <= *p && *p <= 'z') {
-      cur->next = newToken(TK_INDET, p, p + 1);
+    if (isIdent1(*p)) {
+      char *start = p;
+      do {
+        ++p;
+      } while (isIdent2(*p));
+      cur->next = newToken(TK_IDENT, start, p);
       cur = cur->next;
-      ++p;
       continue;
     }
 

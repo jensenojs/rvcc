@@ -73,4 +73,8 @@ assert 8 'a=3; z=5; a+z;'
 assert 6 'a=b=3; a+b;'
 assert 5 'a=3;b=4;a=1;a+b;'
 
+# [11] 支持多字母变量
+assert 3 'foo=3; foo;'
+assert 74 'foo2=70; bar4=4; foo2+bar4;'
+
 echo OK
