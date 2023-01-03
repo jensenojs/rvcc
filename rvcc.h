@@ -65,6 +65,7 @@ typedef enum {
   ND_RETURN, // return
 
   ND_EXPR_STMT, // Expression Statements
+  ND_BLOCK,     // code block {}
 } NodeType;
 
 // AST tree node
@@ -73,6 +74,8 @@ typedef struct Node {
   struct Node *next; // Referring to the next statement
   struct Node *left;
   struct Node *right;
+
+  struct Node *body; // code block
 
   int val;  // store ND_NUM if needed
   Obj *var; // store ND_VAR if needed

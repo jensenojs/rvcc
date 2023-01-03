@@ -65,9 +65,12 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 // Each function represents a generating rule
 // The higher the priority the execution rule is the lower in the AST tree.
 
-// program = stmt*
+// program = "{" compoundStmt
 
-// stmt = "return" expr ";" | exprStmt
+// compoundStmt = stmts * "}"
+static Node *compoundStmt(Token **rest, Token *tok);
+
+// stmt = "return" expr ";" | "{" compoundStmt | exprStmt
 static Node *stmt(Token **rest, Token *tok);
 
 // exprStmt = expr ";"
@@ -99,12 +102,31 @@ static Node *primary(Token **rest, Token *tok);
 
 // =================================================================
 
+Node *compoundStmt(Token **rest, Token *tok) {
+  Node head = {};
+  Node *cur = &head;
+  while (!tokenCompare(tok, "}")) {
+    cur->next = stmt(&tok, tok);
+    cur = cur->next;
+  }
+
+  Node *block = newNode(ND_BLOCK);
+  block->body = head.next;
+  *rest = tok->next;
+  return block;
+}
+
 Node *stmt(Token **rest, Token *tok) {
   if (tokenCompare(tok, "return")) {
     Node *node = newUnary(ND_RETURN, expr(&tok, tok->next));
     *rest = tokenSkip(tok, ";");
     return node;
   }
+
+  if (tokenCompare(tok, "{")) {
+    return compoundStmt(rest, tok->next);
+  }
+
   return exprStmt(rest, tok);
 }
 
@@ -245,18 +267,12 @@ Node *primary(Token **rest, Token *tok) {
 }
 
 Function *parse(Token *tok) {
-  Node head = {};
-  Node *cur = &head;
-
-  while (tok->type != TK_EOF) {
-    cur->next = stmt(&tok, tok);
-    cur = cur->next;
-  }
+  tok = tokenSkip(tok, "{");
 
   // The function body stores the AST of the statement, and Locals stores the
   // variables
   Function *program = calloc(1, sizeof(Function));
-  program->body = head.next;
+  program->body = compoundStmt(&tok, tok);
   program->locals = Locals;
 
   return program;

@@ -134,6 +134,11 @@ static void genStmt(Node *node) {
   case ND_EXPR_STMT:
     genExpr(node->left);
     return;
+  case ND_BLOCK:
+    for (Node *n = node->body; n; n = n->next) {
+      genStmt(n);
+    }
+    return;
   default:
     break;
   }
@@ -177,10 +182,8 @@ void codegen(Function *prog) {
   // the offset is the size of the stack used by the actual variable
   printf("  addi sp, sp, -%d\n", prog->stackSize);
 
-  for (Node *each = prog->body; each; each = each->next) {
-    genStmt(each);
-    assert(StackDepth == 0);
-  }
+  genStmt(prog->body);
+  assert(StackDepth == 0);
 
   // epilogue
 
