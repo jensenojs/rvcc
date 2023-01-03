@@ -70,7 +70,10 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 // compoundStmt = stmts * "}"
 static Node *compoundStmt(Token **rest, Token *tok);
 
-// stmt = "return" expr ";" | "{" compoundStmt | exprStmt
+// stmt = "return" expr ";"
+//        | "if" "(" expr ")" stmt ("else" stmt)?
+//        | "{" compoundStmt
+//        | exprStmt
 static Node *stmt(Token **rest, Token *tok);
 
 // exprStmt = expr? ";"
@@ -120,6 +123,24 @@ Node *stmt(Token **rest, Token *tok) {
   if (tokenCompare(tok, "return")) {
     Node *node = newUnary(ND_RETURN, expr(&tok, tok->next));
     *rest = tokenSkip(tok, ";");
+    return node;
+  }
+
+  if (tokenCompare(tok, "if")) {
+    // if (cond)
+    Node *node = newNode(ND_IF);
+    tok = tokenSkip(tok->next, "(");
+    node->cond = expr(&tok, tok);
+    tok = tokenSkip(tok, ")");
+
+    // stmt satisfied condition
+    node->then = stmt(&tok, tok);
+
+    // ("else" stmt)?
+    if (tokenCompare(tok, "else"))
+      node->els = stmt(&tok, tok->next);
+
+    *rest = tok;
     return node;
   }
 

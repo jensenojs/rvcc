@@ -63,6 +63,7 @@ typedef enum {
   ND_ASSIGN,
   ND_VAR,    // variable
   ND_RETURN, // return
+  ND_IF,     // if
 
   ND_EXPR_STMT, // Expression Statements
   ND_BLOCK,     // code block {}
@@ -79,6 +80,12 @@ typedef struct Node {
 
   int val;  // store ND_NUM if needed
   Obj *var; // store ND_VAR if needed
+
+  // if
+  struct Node *cond; // condition
+  struct Node *then; // then
+  struct Node *els; // else
+
 } Node;
 
 // function

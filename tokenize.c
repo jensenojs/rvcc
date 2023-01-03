@@ -2,15 +2,6 @@
 
 static char *currentInput;
 
-void error(const char *fmt, ...) {
-  va_list va;
-  va_start(va, fmt);         // get all arguments after fmt
-  vfprintf(stderr, fmt, va); // printf the arguments with va_list types
-  fprintf(stderr, "\n");
-  va_end(va);
-  exit(1);
-}
-
 // printf where error occurred
 static void _errorAt(char *idx, char *fmt, va_list va) {
   // 0. print current input
@@ -28,6 +19,15 @@ static void _errorAt(char *idx, char *fmt, va_list va) {
   va_end(va);
 }
 
+void error(const char *fmt, ...) {
+  va_list va;
+  va_start(va, fmt);         // get all arguments after fmt
+  vfprintf(stderr, fmt, va); // printf the arguments with va_list types
+  fprintf(stderr, "\n");
+  va_end(va);
+  exit(1);
+}
+
 // char parsing error
 void errorAt(char *idx, char *fmt, ...) {
   va_list va;
@@ -43,6 +43,8 @@ void errorTok(Token *tok, char *fmt, ...) {
   _errorAt(tok->idx, fmt, va);
   exit(1);
 }
+
+// =========================================================================
 
 static Token *newToken(TokenType type, char *start, char *end) {
   // to simplify, not considering memory recovery recycle
@@ -82,15 +84,6 @@ static int readPunct(char *str) {
   return ispunct(*str) ? 1 : 0;
 }
 
-
-static void markKeyword(Token *tok) {
-  for (Token *t = tok; t->type != TK_EOF; t = t->next) {
-    // 将名为“return”的终结符转为KEYWORD
-    if(tokenCompare(t, "return"))
-      t->type = TK_KEYWORD;
-  }
-}
-
 // rules for determining the initial letter of a ident or a keyword
 // [a-zA-Z_]
 static bool isIdent1(char c) {
@@ -100,6 +93,28 @@ static bool isIdent1(char c) {
 // rules for determining the initial letter of a ident
 // [a-zA-Z_]
 static bool isIdent2(char c) { return isIdent1(c) || ('0' <= c && c <= '9'); }
+
+static bool isKeyword(Token *tok) {
+  static char *kws[] = {
+      "return",
+      "if",
+      "else",
+  };
+
+  for (int i = 0; i < sizeof(kws) / sizeof(*kws); i++)
+    if (tokenCompare(tok, kws[i]))
+      return true;
+
+  return false;
+}
+
+static void markKeyword(Token *tok) {
+  for (Token *t = tok; t->type != TK_EOF; t = t->next) {
+    // 将名为“return”的终结符转为KEYWORD
+    if (isKeyword(t))
+      t->type = TK_KEYWORD;
+  }
+}
 
 // lexical analysis
 Token *tokenize(char *p) {

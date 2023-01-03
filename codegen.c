@@ -3,8 +3,15 @@
  */
 
 #include "rvcc.h"
+#include <stdio.h>
 
 static int StackDepth;
+
+// count for the number of code block
+static int count() {
+  static int I = 1;
+  return I++;
+}
 
 // push the value of a0 onto the stack
 static void push() {
@@ -139,6 +146,25 @@ static void genStmt(Node *node) {
       genStmt(n);
     }
     return;
+  case ND_IF: {
+    int cnt = count();
+    genExpr(node->cond);
+
+    // Check whether the result is 0. If it is 0, go to the else tag
+    printf("  beqz a0, .L.else.%d\n", cnt);
+
+    genStmt(node->then);
+    printf("  j .L.end.%d\n", cnt);
+
+    // Generate tag with or without the else statement
+    printf(".L.else.%d:\n", cnt);
+    if (node->els)
+      genStmt(node->els);
+
+    printf(".L.end.%d:\n", cnt);
+
+    return;
+  }
   default:
     break;
   }
