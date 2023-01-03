@@ -73,7 +73,7 @@ static Node *compoundStmt(Token **rest, Token *tok);
 // stmt = "return" expr ";" | "{" compoundStmt | exprStmt
 static Node *stmt(Token **rest, Token *tok);
 
-// exprStmt = expr ";"
+// exprStmt = expr? ";"
 static Node *exprStmt(Token **rest, Token *tok);
 
 // expr = assign
@@ -131,6 +131,10 @@ Node *stmt(Token **rest, Token *tok) {
 }
 
 Node *exprStmt(Token **rest, Token *tok) {
+  if (tokenCompare(tok, ";")) {
+    *rest = tok->next;
+    return newNode(ND_BLOCK);
+  }
   Node *node = newUnary(ND_EXPR_STMT, expr(&tok, tok));
   *rest = tokenSkip(tok, ";");
   return node;
