@@ -124,10 +124,20 @@ static void genExpr(Node *node) {
 }
 
 static void genStmt(Node *node) {
-  if (node->type == ND_EXPR_STMT) {
+  switch (node->type) {
+  case ND_RETURN:
+    genExpr(node->left);
+    // no condition jumps : jumps to .L.return segement
+    // the way represent "j offset" is jal x0.
+    printf("  j .L.return\n");
+    return;
+  case ND_EXPR_STMT:
     genExpr(node->left);
     return;
+  default:
+    break;
   }
+
   error("invalid expression");
 }
 
@@ -173,6 +183,9 @@ void codegen(Function *prog) {
   }
 
   // epilogue
+
+  // return segment tag
+  printf(".L.return:\n");
 
   // write fp to sp
   printf("  mv sp, fp\n");

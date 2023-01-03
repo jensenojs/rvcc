@@ -67,7 +67,8 @@ static Node *newBinary(NodeType type, Node *left, Node *right) {
 
 // program = stmt*
 
-// stmt = exprStmt
+// stmt = "return" expr ";" | exprStmt
+static Node *stmt(Token **rest, Token *tok);
 
 // exprStmt = expr ";"
 static Node *exprStmt(Token **rest, Token *tok);
@@ -98,7 +99,14 @@ static Node *primary(Token **rest, Token *tok);
 
 // =================================================================
 
-Node *stmt(Token **rest, Token *tok) { return exprStmt(rest, tok); }
+Node *stmt(Token **rest, Token *tok) {
+  if (tokenCompare(tok, "return")) {
+    Node *node = newUnary(ND_RETURN, expr(&tok, tok->next));
+    *rest = tokenSkip(tok, ";");
+    return node;
+  }
+  return exprStmt(rest, tok);
+}
 
 Node *exprStmt(Token **rest, Token *tok) {
   Node *node = newUnary(ND_EXPR_STMT, expr(&tok, tok));

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 校验rvcc生成的汇编能够正确运行的辅助函数
 assert() {
     expected="$1"  # expected arg number
     input="$2"     # argument sent to rvcc
@@ -17,64 +18,71 @@ assert() {
     fi
 }
 
+# 默认make即make test，展开回归测试
+
 # [1] 支持返回特定数值
-assert 42 '42;'
+assert 42 'return 42;'
 
 # [2] 支持+ -运算符
-assert 34 '12-34+ 56;'
+assert 34 'return 12-34+ 56;'
 
 # [3] 支持空白符识别
-assert 41 '12 + 34  - 5 ;'
+assert 41 'return 12 + 34  - 5 ;'
 
 # [4] 改进报错信息
 # 输入./rvcc 1+s 回车，可以观察到结果
 
 # [5] 支持 *， /，() 运算符
-assert 47 '5+6*7;'
-assert 77 '(5+6)*7;'
-assert 15 '5*(9-6);'
-assert 17 '1-8/(2*2)+3*6;'
+assert 47 'return 5+6*7;'
+assert 77 'return (5+6)*7;'
+assert 15 'return 5*(9-6);'
+assert 17 'return 1-8/(2*2)+3*6;'
 
 # [6] 支持一元运算符+， -
-assert 10 '-10+20;'
-assert 10 '--10;'
-assert 10 '- - +10;'
-assert 48 '------12*+++++----++++++++++4;'
+assert 10 'return -10+20;'
+assert 10 'return --10;'
+assert 10 'return - - +10;'
+assert 48 'return ------12*+++++----++++++++++4;'
 
 # [7] 支持 == != <= >=
-assert 0 '0==1;'
-assert 1 '42==42;'
-assert 1 '0!=1;'
-assert 0 '42!=42;'
-assert 1 '0<1;'
-assert 0 '1<1;'
-assert 0 '2<1;'
-assert 1 '0<=1;'
-assert 1 '1<=1;'
-assert 0 '2<=1;'
-assert 1 '1>0;'
-assert 0 '1>1;'
-assert 0 '1>2;'
-assert 1 '1>=0;'
-assert 1 '1>=1;'
-assert 0 '1>=2;'
-assert 1 '5==2+3;'
-assert 0 '6==4+3;'
-assert 1 '0*9+5*2==4+4*(6/3)-2;'
+assert 0 'return 0==1;'
+assert 1 'return 42==42;'
+assert 1 'return 0!=1;'
+assert 0 'return 42!=42;'
+assert 1 'return 0<1;'
+assert 0 'return 1<1;'
+assert 0 'return 2<1;'
+assert 1 'return 0<=1;'
+assert 1 'return 1<=1;'
+assert 0 'return 2<=1;'
+assert 1 'return 1>0;'
+assert 0 'return 1>1;'
+assert 0 'return 1>2;'
+assert 1 'return 1>=0;'
+assert 1 'return 1>=1;'
+assert 0 'return 1>=2;'
+assert 1 'return 5==2+3;'
+assert 0 'return 6==4+3;'
+assert 1 'return 0*9+5*2==4+4*(6/3)-2;'
 
 #[8] 将main.c拆分成多个文件
 
 #[9]  支持 ; 分割语句
 
 # [10] 支持单字母变量
-assert 3 'a=3; a;'
-assert 5 'a=3; z=5; z;'
-assert 8 'a=3; z=5; a+z;'
-assert 6 'a=b=3; a+b;'
-assert 5 'a=3;b=4;a=1;a+b;'
+assert 3 'a=3; return a;'
+assert 5 'a=3; z=5; return z;'
+assert 8 'a=3; z=5; return a+z;'
+assert 6 'a=b=3; return a+b;'
+assert 5 'a=3;b=4;a=1;return a+b;'
 
 # [11] 支持多字母变量
-assert 3 'foo=3; foo;'
-assert 74 'foo2=70; bar4=4; foo2+bar4;'
+assert 3 'foo=3; return foo;'
+assert 74 'foo2=70; bar4=4; return foo2+bar4;'
+
+# [12] 支持return语句
+assert 1 'return 1; 2; 3;'
+assert 2 '1; return 2; 3;'
+assert 3 '1; 2; return 3;'
 
 echo OK

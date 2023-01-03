@@ -14,8 +14,9 @@
 typedef enum {
   TK_INVALID = 0,
   TK_IDENT, // mark for variable name and function name
-  TK_PUNCT,
+  TK_PUNCT, // opertor like +, -
   TK_NUM,
+  TK_KEYWORD, // return
   TK_EOF,
 } TokenType;
 
@@ -60,7 +61,8 @@ typedef enum {
   ND_LE, // <= (or >=)
 
   ND_ASSIGN,
-  ND_VAR, // variable
+  ND_VAR,    // variable
+  ND_RETURN, // return
 
   ND_EXPR_STMT, // Expression Statements
 } NodeType;

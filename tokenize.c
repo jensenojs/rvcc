@@ -82,7 +82,16 @@ static int readPunct(char *str) {
   return ispunct(*str) ? 1 : 0;
 }
 
-// rules for determining the initial letter of a ident
+
+static void markKeyword(Token *tok) {
+  for (Token *t = tok; t->type != TK_EOF; t = t->next) {
+    // 将名为“return”的终结符转为KEYWORD
+    if(tokenCompare(t, "return"))
+      t->type = TK_KEYWORD;
+  }
+}
+
+// rules for determining the initial letter of a ident or a keyword
 // [a-zA-Z_]
 static bool isIdent1(char c) {
   return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
@@ -141,5 +150,9 @@ Token *tokenize(char *p) {
   }
   // add eof to represents the end
   cur->next = newToken(TK_EOF, p, p);
+
+  // mark if one token is keyword
+  markKeyword(head.next);
+
   return head.next;
 }
