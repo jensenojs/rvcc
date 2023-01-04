@@ -105,4 +105,6 @@ assert 3 '{ for (;;) {return 3;} return 5; }'
 # [17] 支持while语句
 assert 10 '{ i=0; while(i<10) { i=i+1; } return i; }'
 
+# [18] 更新辅助信息(.s生成的注释)
+
 echo OK
