@@ -64,6 +64,7 @@ typedef enum {
   ND_VAR,    // variable
   ND_RETURN, // return
   ND_IF,     // if
+  ND_FOR,    // for
 
   ND_EXPR_STMT, // Expression Statements
   ND_BLOCK,     // code block {}
@@ -78,13 +79,16 @@ typedef struct Node {
 
   struct Node *body; // code block
 
-  int val;  // store ND_NUM if needed
-  Obj *var; // store ND_VAR if needed
+  int val;  // store value for ND_NUM
+  Obj *var; // store value for ND_VAR
 
-  // if
+  // if or for will use
   struct Node *cond; // condition
   struct Node *then; // then
-  struct Node *els; // else
+  struct Node *els;  // else
+
+  struct Node *init; // initialization for ND_FOR
+  struct Node *inc;  // increment for ND_FOR
 
 } Node;
 

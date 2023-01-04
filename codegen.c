@@ -45,7 +45,6 @@ static void genAddr(Node *node) {
   error("not an lvalue");
 }
 
-// traversing the AST tree to generate assembly code
 static void genExpr(Node *node) {
 
   // load data to a0 register
@@ -119,7 +118,6 @@ static void genExpr(Node *node) {
     return;
   case ND_LE:
     // a0 <= a1 <==> a0 = a1 < a0, a0 = a1^1
-
     printf("  slt a0, a1, a0\n");
     printf("  xori a0, a0, 1\n");
     return;
@@ -165,11 +163,32 @@ static void genStmt(Node *node) {
 
     return;
   }
+  case ND_FOR: {
+    int cnt = count();
+    genStmt(node->init);
+    printf(".L.begin.%d:\n", cnt); // printf loop header tag
+    if (node->cond) {
+      genExpr(node->cond);
+      printf("  beqz a0, .L.end.%d\n", cnt); // Determine if the result is 0, if
+                                             // it is 0 then jump to the end tag
+    }
+
+    genStmt(node->then); // Generate loop body statements
+
+    if (node->inc) // handling loop increment statements
+      genExpr(node->inc);
+
+    printf(" j .L.begin.%d\n", cnt);
+    // 输出循环尾部标签
+    printf(".L.end.%d:\n", cnt);
+
+    return;
+  }
   default:
     break;
   }
 
-  error("invalid expression");
+  error("invalid Statement");
 }
 
 // Calculate the offset from the variable's linked list
@@ -182,6 +201,7 @@ static void assignLVarOffset(Function *prog) {
   }
 }
 
+// traversing the AST tree to generate assembly code
 // code generation entry function, containing the base information of the code
 // block
 void codegen(Function *prog) {

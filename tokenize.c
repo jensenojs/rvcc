@@ -96,9 +96,10 @@ static bool isIdent2(char c) { return isIdent1(c) || ('0' <= c && c <= '9'); }
 
 static bool isKeyword(Token *tok) {
   static char *kws[] = {
-      "return",
-      "if",
-      "else",
+    "return",
+    "if",
+    "else",
+    "for",
   };
 
   for (int i = 0; i < sizeof(kws) / sizeof(*kws); i++)
