@@ -46,7 +46,7 @@ static void genAddr(Node *node) {
            node->var->offSet); // fp is frame pointer, also named as x8, s0
     return;
   }
-  error("not an lvalue");
+  errorTok(node->tok, "not an lvalue");
 }
 
 static void genExpr(Node *node) {
@@ -140,7 +140,7 @@ static void genExpr(Node *node) {
     break;
   }
 
-  error("invalid expression");
+  errorTok(node->tok, "invalid expression");
 }
 
 static void genStmt(Node *node) {
@@ -229,7 +229,7 @@ static void genStmt(Node *node) {
     break;
   }
 
-  error("invalid Statement");
+  errorTok(node->tok, "invalid Statement");
 }
 
 // Calculate the offset from the variable's linked list
@@ -264,7 +264,8 @@ void codegen(Function *prog) {
   // prologue
 
   // push fp onto the stack, preserving the value of fp
-  printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值, 这里不适合用push和pop\n");
+  printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值, "
+         "这里不适合用push和pop\n");
   printf("  addi sp, sp, -8\n");
   printf("  sd fp, 0(sp)\n");
   // write sp to fp

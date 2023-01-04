@@ -74,6 +74,7 @@ typedef enum {
 typedef struct Node {
   NodeType type;
   struct Node *next; // Referring to the next statement
+  Token *tok;        // reference to the token
   struct Node *left;
   struct Node *right;
 

@@ -1,5 +1,4 @@
 #include "rvcc.h"
-#include <stdlib.h>
 
 // during parsing, all variable instances are added to this list
 static Obj *Locals;
@@ -31,32 +30,33 @@ static Obj *findVar(Token *tok) {
 
 // Those below are the types of AST node, newNode is a helper function to
 // generate different types of nodes.
-static Node *newNode(NodeType type) {
-  Node *d = calloc(1, sizeof(Node));
-  d->type = type;
-  return d;
+static Node *newNode(NodeType type, Token *tok) {
+  Node *node = calloc(1, sizeof(Node));
+  node->type = type;
+  node->tok = tok;
+  return node;
 }
 
-static Node *newNum(int val) {
-  Node *node = newNode(ND_NUM);
+static Node *newNum(int val, Token *tok) {
+  Node *node = newNode(ND_NUM, tok);
   node->val = val;
   return node;
 }
 
-static Node *newUnary(NodeType type, Node *expr) {
-  Node *node = newNode(type);
+static Node *newUnary(NodeType type, Node *expr, Token *tok) {
+  Node *node = newNode(type, tok);
   node->left = expr;
   return node;
 }
 
-static Node *newVarNode(Obj *var) {
-  Node *node = newNode(ND_VAR);
+static Node *newVarNode(Obj *var, Token *tok) {
+  Node *node = newNode(ND_VAR, tok);
   node->var = var;
   return node;
 }
 
-static Node *newBinary(NodeType type, Node *left, Node *right) {
-  Node *node = newNode(type);
+static Node *newBinary(NodeType type, Node *left, Node *right, Token *tok) {
+  Node *node = newNode(type, tok);
   node->left = left;
   node->right = right;
   return node;
@@ -108,14 +108,15 @@ static Node *primary(Token **rest, Token *tok);
 // =================================================================
 
 Node *compoundStmt(Token **rest, Token *tok) {
+  Node *block = newNode(ND_BLOCK, tok);
   Node head = {};
   Node *cur = &head;
+
   while (!tokenCompare(tok, "}")) {
     cur->next = stmt(&tok, tok);
     cur = cur->next;
   }
 
-  Node *block = newNode(ND_BLOCK);
   block->body = head.next;
   *rest = tok->next;
   return block;
@@ -123,14 +124,15 @@ Node *compoundStmt(Token **rest, Token *tok) {
 
 Node *stmt(Token **rest, Token *tok) {
   if (tokenCompare(tok, "return")) {
-    Node *node = newUnary(ND_RETURN, expr(&tok, tok->next));
+    Node *node = newNode(ND_RETURN, tok);
+    node->left = expr(&tok, tok->next);
     *rest = tokenSkip(tok, ";");
     return node;
   }
 
   if (tokenCompare(tok, "if")) {
     // if (cond)
-    Node *node = newNode(ND_IF);
+    Node *node = newNode(ND_IF, tok);
     tok = tokenSkip(tok->next, "(");
     node->cond = expr(&tok, tok);
     tok = tokenSkip(tok, ")");
@@ -147,7 +149,7 @@ Node *stmt(Token **rest, Token *tok) {
   }
 
   if (tokenCompare(tok, "for")) {
-    Node *node = newNode(ND_LOOP);
+    Node *node = newNode(ND_LOOP, tok);
     tok = tokenSkip(tok->next, "(");
 
     node->init = exprStmt(&tok, tok);
@@ -166,7 +168,7 @@ Node *stmt(Token **rest, Token *tok) {
   }
 
   if (tokenCompare(tok, "while")) {
-    Node *node = newNode(ND_LOOP);
+    Node *node = newNode(ND_LOOP, tok);
     tok = tokenSkip(tok->next, "(");
     node->cond = expr(&tok, tok);
     tok = tokenSkip(tok, ")");
@@ -184,9 +186,12 @@ Node *stmt(Token **rest, Token *tok) {
 Node *exprStmt(Token **rest, Token *tok) {
   if (tokenCompare(tok, ";")) {
     *rest = tok->next;
-    return newNode(ND_BLOCK);
+    return newNode(ND_BLOCK, tok);
   }
-  Node *node = newUnary(ND_EXPR_STMT, expr(&tok, tok));
+
+  Node *node = newNode(ND_EXPR_STMT, tok);
+  node->left = expr(&tok, tok);
+
   *rest = tokenSkip(tok, ";");
   return node;
 }
@@ -197,7 +202,7 @@ Node *assign(Token **rest, Token *tok) {
   Node *node = equality(&tok, tok);
 
   if (tokenCompare(tok, "="))
-    node = newBinary(ND_ASSIGN, node, assign(&tok, tok->next));
+    return node = newBinary(ND_ASSIGN, node, assign(rest, tok->next), tok);
 
   *rest = tok;
   return node;
@@ -207,14 +212,18 @@ Node *equality(Token **rest, Token *tok) {
   Node *node = relational(&tok, tok);
 
   while (true) {
+    Token *start = tok;
+
     if (tokenCompare(tok, "==")) {
-      node = newBinary(ND_EQ, node, relational(&tok, tok->next));
+      node = newBinary(ND_EQ, node, relational(&tok, tok->next), start);
       continue;
     }
+
     if (tokenCompare(tok, "!=")) {
-      node = newBinary(ND_NE, node, relational(&tok, tok->next));
+      node = newBinary(ND_NE, node, relational(&tok, tok->next), start);
       continue;
     }
+
     break;
   }
 
@@ -226,22 +235,28 @@ Node *relational(Token **rest, Token *tok) {
   Node *node = add(&tok, tok);
 
   while (true) {
+    Token *start = tok;
+
     if (tokenCompare(tok, "<")) {
-      node = newBinary(ND_LT, node, relational(&tok, tok->next));
+      node = newBinary(ND_LT, node, relational(&tok, tok->next), start);
       continue;
     }
+
     if (tokenCompare(tok, "<=")) {
-      node = newBinary(ND_LE, node, relational(&tok, tok->next));
+      node = newBinary(ND_LE, node, relational(&tok, tok->next), start);
       continue;
     }
+
     if (tokenCompare(tok, ">")) {
-      node = newBinary(ND_LT, relational(&tok, tok->next), node);
+      node = newBinary(ND_LT, relational(&tok, tok->next), node, start);
       continue;
     }
+
     if (tokenCompare(tok, ">=")) {
-      node = newBinary(ND_LE, relational(&tok, tok->next), node);
+      node = newBinary(ND_LE, relational(&tok, tok->next), node, start);
       continue;
     }
+
     break;
   }
 
@@ -253,14 +268,18 @@ Node *add(Token **rest, Token *tok) {
   Node *node = mul(&tok, tok);
 
   while (true) {
+    Token *start = tok;
+
     if (tokenCompare(tok, "+")) {
-      node = newBinary(ND_ADD, node, mul(&tok, tok->next));
+      node = newBinary(ND_ADD, node, mul(&tok, tok->next), start);
       continue;
     }
+
     if (tokenCompare(tok, "-")) {
-      node = newBinary(ND_SUB, node, mul(&tok, tok->next));
+      node = newBinary(ND_SUB, node, mul(&tok, tok->next), start);
       continue;
     }
+
     break;
   }
   *rest = tok;
@@ -271,13 +290,14 @@ Node *mul(Token **rest, Token *tok) {
   Node *node = unary(&tok, tok);
 
   while (true) {
+    Token *start = tok;
     if (tokenCompare(tok, "*")) {
-      node = newBinary(ND_MUL, node, unary(&tok, tok->next));
+      node = newBinary(ND_MUL, node, unary(&tok, tok->next), start);
       continue;
     }
 
     if (tokenCompare(tok, "/")) {
-      node = newBinary(ND_DIV, node, unary(&tok, tok->next));
+      node = newBinary(ND_DIV, node, unary(&tok, tok->next), start);
       continue;
     }
 
@@ -292,7 +312,7 @@ Node *unary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "+"))
     return unary(rest, tok->next);
   if (tokenCompare(tok, "-"))
-    return newUnary(ND_NEG, unary(rest, tok->next));
+    return newUnary(ND_NEG, unary(rest, tok->next), tok);
   return primary(rest, tok);
 }
 
@@ -308,11 +328,11 @@ Node *primary(Token **rest, Token *tok) {
     if (!var)
       var = newLVar(strndup(tok->idx, tok->len));
     *rest = tok->next;
-    return newVarNode(var);
+    return newVarNode(var, tok);
   }
 
   if (tok->type == TK_NUM) {
-    Node *node = newNum(tok->val);
+    Node *node = newNum(tok->val, tok);
     *rest = tok->next;
     return node;
   }
