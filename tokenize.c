@@ -100,6 +100,9 @@ static bool isKeyword(Token *tok) {
     "if",
     "else",
     "for",
+    "while",
+    "break",
+    "continue",
   };
 
   for (int i = 0; i < sizeof(kws) / sizeof(*kws); i++)

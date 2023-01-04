@@ -72,6 +72,7 @@ static Node *compoundStmt(Token **rest, Token *tok);
 
 // stmt = "return" expr ";"
 //        | "if" "(" expr ")" stmt ("else" stmt)?
+//        | "while" "(" expr ")" stmt
 //        | "for" "(" exprStmt expr? ";" expr? ")" stmt
 //        | "{" compoundStmt
 //        | exprStmt
@@ -146,7 +147,7 @@ Node *stmt(Token **rest, Token *tok) {
   }
 
   if (tokenCompare(tok, "for")) {
-    Node *node = newNode(ND_FOR);
+    Node *node = newNode(ND_LOOP);
     tok = tokenSkip(tok->next, "(");
 
     node->init = exprStmt(&tok, tok);
@@ -160,6 +161,15 @@ Node *stmt(Token **rest, Token *tok) {
       node->inc = expr(&tok, tok);
     tok = tokenSkip(tok, ")");
 
+    node->then = stmt(rest, tok);
+    return node;
+  }
+
+  if (tokenCompare(tok, "while")) {
+    Node *node = newNode(ND_LOOP);
+    tok = tokenSkip(tok->next, "(");
+    node->cond = expr(&tok, tok);
+    tok = tokenSkip(tok, ")");
     node->then = stmt(rest, tok);
     return node;
   }

@@ -64,7 +64,7 @@ typedef enum {
   ND_VAR,    // variable
   ND_RETURN, // return
   ND_IF,     // if
-  ND_FOR,    // for
+  ND_LOOP,   // for or while
 
   ND_EXPR_STMT, // Expression Statements
   ND_BLOCK,     // code block {}

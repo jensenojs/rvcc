@@ -163,10 +163,14 @@ static void genStmt(Node *node) {
 
     return;
   }
-  case ND_FOR: {
+  case ND_LOOP: { // for or while loop
     int cnt = count();
-    genStmt(node->init);
+
+    if (node->init)
+      genStmt(node->init);
+
     printf(".L.begin.%d:\n", cnt); // printf loop header tag
+
     if (node->cond) {
       genExpr(node->cond);
       printf("  beqz a0, .L.end.%d\n", cnt); // Determine if the result is 0, if
