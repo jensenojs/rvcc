@@ -99,7 +99,7 @@ static Node *add(Token **rest, Token *tok);
 // mul = unary ("*" unary | "/" unary) *
 static Node *mul(Token **rest, Token *tok);
 
-// unary = ( "+" | "-" ) unary | primary
+// unary = ( "+" | "-" | "*" | "&") unary | primary
 static Node *unary(Token **rest, Token *tok);
 
 // primary = "(" expr ")" | num | ident(variable)
@@ -311,8 +311,16 @@ Node *mul(Token **rest, Token *tok) {
 Node *unary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "+"))
     return unary(rest, tok->next);
+  
   if (tokenCompare(tok, "-"))
     return newUnary(ND_NEG, unary(rest, tok->next), tok);
+
+  if (tokenCompare(tok, "&"))
+    return newUnary(ND_ADDR, unary(rest, tok->next), tok);
+  
+  if (tokenCompare(tok, "*"))
+    return newUnary(ND_DEREF, unary(rest, tok->next), tok);
+
   return primary(rest, tok);
 }
 

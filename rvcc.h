@@ -1,5 +1,5 @@
-// POSIX.1标准
-// 使用了strndup函数
+// POSIX.1
+// for use strndup
 #define _POSIX_C_SOURCE 200809L
 
 #include <assert.h>
@@ -65,6 +65,8 @@ typedef enum {
   ND_RETURN, // return
   ND_IF,     // if
   ND_LOOP,   // for or while
+  ND_ADDR,   // &
+  ND_DEREF,  // *
 
   ND_EXPR_STMT, // Expression Statements
   ND_BLOCK,     // code block {}

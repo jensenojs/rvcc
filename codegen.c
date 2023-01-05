@@ -7,6 +7,8 @@
 
 static int StackDepth;
 
+static void genExpr(Node *node);
+
 // count for the number of code block
 static int count() {
   static int I = 1;
@@ -37,14 +39,21 @@ static int alighTo(int n, int align) {
   // (0, align] -> align
   return (n + align - 1) / align * align;
 }
+
 // offset is relative to fp
 static void genAddr(Node *node) {
-  if (node->type == ND_VAR) {
+  switch (node->type) {
+  case ND_VAR:
     printf("  # 获取变量%s的栈内地址为%d(fp)\n", node->var->name,
            node->var->offSet);
     printf("  addi a0, fp, %d\n",
            node->var->offSet); // fp is frame pointer, also named as x8, s0
     return;
+  case ND_DEREF:
+    genExpr(node->left);
+    return;
+  default:
+    break;
   }
   errorTok(node->tok, "not an lvalue");
 }
@@ -78,6 +87,14 @@ static void genExpr(Node *node) {
     pop("a1");
     printf("  # 将a0的值, 写入到a1中存放的地址\n");
     printf("  sd a0, 0(a1)\n"); // assign
+    return;
+  case ND_DEREF:
+    genExpr(node->left);
+    printf("  # 读取a0中存放的地址, 得到的值存入a0\n");
+    printf("  ld a0, 0(a0)\n");
+    return;
+  case ND_ADDR:
+    genAddr(node->left);
     return;
   default:
     break;

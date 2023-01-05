@@ -109,5 +109,13 @@ assert 10 '{ i=0; while(i<10) { i=i+1; } return i; }'
 
 # [19] 为节点添加相应的终结符，以改进报错信息
 
+# [20] 支持一元& *运算符
+assert 3 '{ x=3; return *&x; }'
+assert 3 '{ x=3; y=&x; z=&y; return **z; }'
+assert 5 '{ x=3; y=5; return *(&x+8); }' # 不符合C语言规定，在下一个commit中需要引入类型系统的支持才能做到
+assert 3 '{ x=3; y=5; return *(&y-8); }'
+assert 5 '{ x=3; y=&x; *y=5; return x; }'
+assert 7 '{ x=3; y=5; *(&x+8)=7; return y; }'
+assert 7 '{ x=3; y=5; *(&y-8)=7; return x; }'
 
 echo OK
