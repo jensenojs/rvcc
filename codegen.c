@@ -42,7 +42,7 @@ static int alighTo(int n, int align) {
 
 // offset is relative to fp
 static void genAddr(Node *node) {
-  switch (node->type) {
+  switch (node->nodeType) {
   case ND_VAR:
     printf("  # 获取变量%s的栈内地址为%d(fp)\n", node->var->name,
            node->var->offSet);
@@ -61,7 +61,7 @@ static void genAddr(Node *node) {
 static void genExpr(Node *node) {
 
   // load data to a0 register
-  switch (node->type) {
+  switch (node->nodeType) {
   case ND_NUM:
     printf("  # 将%d加载到a0中\n", node->val);
     printf("  li a0, %d\n", node->val);
@@ -107,7 +107,7 @@ static void genExpr(Node *node) {
   pop("a1");
 
   // generate what each binary tree node does in assembly code
-  switch (node->type) {
+  switch (node->nodeType) {
   case ND_ADD:
     printf("  # a0+a1, 结果写入a0\n");
     printf("  add a0, a0, a1\n");
@@ -127,11 +127,11 @@ static void genExpr(Node *node) {
   case ND_EQ:
   case ND_NE:
     // first compare the two values to see if they are equal
-    printf("  # 判断是否a0%sa1\n", node->type == ND_EQ ? "=" : "≠");
+    printf("  # 判断是否a0%sa1\n", node->nodeType == ND_EQ ? "=" : "≠");
     printf("  xor a0, a0, a1\n");
 
     // then base on condition to set 1 or 0 to reg
-    if (node->type == ND_EQ)
+    if (node->nodeType == ND_EQ)
       // Set if Equal to Zero (rd, rs1)
       // if x[rd] == 0, then write 1 to x[rs1] otherwise 0
       printf("  seqz a0, a0\n");
@@ -161,7 +161,7 @@ static void genExpr(Node *node) {
 }
 
 static void genStmt(Node *node) {
-  switch (node->type) {
+  switch (node->nodeType) {
   case ND_RETURN:
     printf("# 返回语句\n");
     genExpr(node->left);

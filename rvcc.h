@@ -43,6 +43,19 @@ typedef struct Obj {
   int offSet; // the offset of fp
 } Obj;
 
+typedef enum {
+  TY_INT,
+  TY_POINTER,
+} TypeKind;
+
+typedef struct Type {
+  TypeKind kind;
+  struct Type *base;
+} Type;
+
+// define in type.c
+extern Type *TyInt;
+
 // Types of Nodes for AST
 typedef enum {
   ND_INVALID = 0,
@@ -74,9 +87,12 @@ typedef enum {
 
 // AST tree node
 typedef struct Node {
-  NodeType type;
+  NodeType nodeType;
+  Type *dataType;    // the data type in the node
+
   struct Node *next; // Referring to the next statement
   Token *tok;        // reference to the token
+
   struct Node *left;
   struct Node *right;
 
@@ -90,8 +106,8 @@ typedef struct Node {
   struct Node *then; // then
   struct Node *els;  // else
 
-  struct Node *init; // initialization for ND_FOR
-  struct Node *inc;  // increment for ND_FOR
+  struct Node *init; // initialization for ND_LOOP(for)
+  struct Node *inc;  // increment for ND_LOOP(for and while)
 
 } Node;
 
@@ -110,3 +126,9 @@ Function *parse(Token *Tok);
 
 // Code Generation entry
 void codegen(Function *prog);
+
+// judge if is int
+bool isInteger(Type *ty);
+
+// all nodes within a node add type
+void addType(Node *Nd);

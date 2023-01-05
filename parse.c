@@ -32,7 +32,7 @@ static Obj *findVar(Token *tok) {
 // generate different types of nodes.
 static Node *newNode(NodeType type, Token *tok) {
   Node *node = calloc(1, sizeof(Node));
-  node->type = type;
+  node->nodeType = type;
   node->tok = tok;
   return node;
 }
@@ -115,6 +115,8 @@ Node *compoundStmt(Token **rest, Token *tok) {
   while (!tokenCompare(tok, "}")) {
     cur->next = stmt(&tok, tok);
     cur = cur->next;
+    // after AST tree is done, add type info for node.
+    addType(cur);
   }
 
   block->body = head.next;
@@ -264,6 +266,60 @@ Node *relational(Token **rest, Token *tok) {
   return node;
 }
 
+// parse multiple types of add
+static Node *newAdd(Node *left, Node *right, Token *tok) {
+  addType(left);
+  addType(right);
+
+  // num + num
+  if (isInteger(left->dataType) && isInteger(right->dataType))
+    return newBinary(ND_ADD, left, right, tok);
+
+  if (left->dataType->base && right->dataType->base)
+    errorTok(tok, "invalid operand");
+
+  // convert num + ptr to ptr + num if necessary
+  if (!left->dataType->base && right->dataType->base) {
+    Node *tmp = left;
+    left = right;
+    right = tmp;
+  }
+
+  // ptr + num
+  right = newBinary(ND_MUL, right, newNum(8, tok),
+                    tok); // ptr + 1 (1 means 8 bytes, so need to MUL 8 first)
+  return newBinary(ND_ADD, left, right, tok);
+}
+
+// parse multiple types of sub
+static Node *newSub(Node *left, Node *right, Token *tok) {
+  addType(left);
+  addType(right);
+
+  // num - num
+  if (isInteger(left->dataType) && isInteger(right->dataType))
+    return newBinary(ND_SUB, left, right, tok);
+
+  // ptr - num
+  if (left->dataType->base && isInteger(right->dataType)) {
+    right = newBinary(ND_MUL, right, newNum(8, tok), tok);
+    addType(right);
+    Node *node = newBinary(ND_SUB, left, right, tok);
+    node->dataType = left->dataType;
+    return node;
+  }
+
+  // ptr - ptr
+  if (left->dataType->base && right->dataType->base) {
+    Node *node = newBinary(ND_SUB, left, right, tok);
+    node->dataType = TyInt;
+    return newBinary(ND_DIV, node, newNum(8, tok), tok);
+  }
+
+  errorTok(tok, "invalid operands");
+  return NULL;
+}
+
 Node *add(Token **rest, Token *tok) {
   Node *node = mul(&tok, tok);
 
@@ -271,12 +327,12 @@ Node *add(Token **rest, Token *tok) {
     Token *start = tok;
 
     if (tokenCompare(tok, "+")) {
-      node = newBinary(ND_ADD, node, mul(&tok, tok->next), start);
+      node = newAdd(node, mul(&tok, tok->next), start);
       continue;
     }
 
     if (tokenCompare(tok, "-")) {
-      node = newBinary(ND_SUB, node, mul(&tok, tok->next), start);
+      node = newSub(node, mul(&tok, tok->next), start);
       continue;
     }
 
@@ -311,13 +367,13 @@ Node *mul(Token **rest, Token *tok) {
 Node *unary(Token **rest, Token *tok) {
   if (tokenCompare(tok, "+"))
     return unary(rest, tok->next);
-  
+
   if (tokenCompare(tok, "-"))
     return newUnary(ND_NEG, unary(rest, tok->next), tok);
 
   if (tokenCompare(tok, "&"))
     return newUnary(ND_ADDR, unary(rest, tok->next), tok);
-  
+
   if (tokenCompare(tok, "*"))
     return newUnary(ND_DEREF, unary(rest, tok->next), tok);
 
