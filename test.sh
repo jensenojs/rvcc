@@ -1,12 +1,20 @@
 #!/bin/bash
 
+# 将下列代码编译为tmp2.o，"-xc"强制以c语言进行编译
+# cat <<EOF | gcc -xc -c -o tmp2.o -
+cat <<EOF | $RISCV/bin/riscv64-unknown-linux-gnu-gcc -xc -c -o tmp2.o -
+int ret3() { return 3; }
+int ret5() { return 5; }
+EOF
+
 # 校验rvcc生成的汇编能够正确运行的辅助函数
 assert() {
     expected="$1"  # expected arg number
     input="$2"     # argument sent to rvcc
 
     ./rvcc "$input" > tmp.s || exit # "$input" but not $input
-    riscv64-unknown-linux-gnu-gcc -static -o tmp tmp.s
+    # gcc -static -o tmp tmp.s tmp2.o
+    $RISCV/bin/riscv64-unknown-linux-gnu-gcc -static -o tmp tmp.s tmp2.o
 
     qemu-riscv64 -L $RISCV/sysroot ./tmp
     actual="$?"
@@ -123,5 +131,10 @@ assert 7 '{ int x=3; int y=5; *(&x+1)=7; return y; }'
 # [22] 支持int关键字
 assert 8 '{ int x, y; x=3; y=5; return x+y; }'
 assert 8 '{ int x=3, y=5; return x+y; }'
+
+# [23] 支持零参函数调用
+assert 3 '{ return ret3(); }'
+assert 5 '{ return ret5(); }'
+assert 8 '{ return ret3()+ret5(); }'
 
 echo OK

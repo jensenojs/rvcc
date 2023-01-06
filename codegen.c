@@ -96,6 +96,10 @@ static void genExpr(Node *node) {
   case ND_ADDR:
     genAddr(node->left);
     return;
+  case ND_FUNCALL:
+    printf("\n  # 调用函数%s\n", node->funcName);
+    printf("  call %s\n", node->funcName);
+    return;
   default:
     break;
   }
@@ -271,19 +275,22 @@ void codegen(Function *prog) {
   printf("main:\n");
   // stack layout
   //-------------------------------// sp
-  //              fp                  fp = sp-8
-  //-------------------------------// fp
+  //              ra
+  //-------------------------------// ra = sp-8
+  //              fp
+  //-------------------------------// fp = sp-16
   //           variable            //
-  //-------------------------------// sp=sp-8-StackSize
+  //-------------------------------// sp = sp-16-StackSize
   //     Expression evaluation
   //-------------------------------//
 
   // prologue
 
-  // push fp onto the stack, preserving the value of fp
-  printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值, "
-         "这里不适合用push和pop\n");
-  printf("  addi sp, sp, -8\n");
+  // 将ra寄存器压栈,保存ra的值
+  printf("  # 将ra寄存器压栈,保存ra的值, ra寄存器保存的是返回地址\n");
+  printf("  addi sp, sp, -16\n");
+  printf("  sd ra, 8(sp)\n");
+  printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值\n");
   printf("  sd fp, 0(sp)\n");
   // write sp to fp
   printf("  # 将sp的值写入fp\n");
@@ -310,7 +317,10 @@ void codegen(Function *prog) {
   // pop the stack of the earliest fp saved values and restore fp.
   printf("  # 将最早fp保存的值弹栈, 恢复fp和sp\n");
   printf("  ld fp, 0(sp)\n");
-  printf("  addi sp, sp, 8\n");
+  // 将ra寄存器弹栈,恢复ra的值
+  printf("  # 将ra寄存器弹栈,恢复ra的值\n");
+  printf("  ld ra, 8(sp)\n");
+  printf("  addi sp, sp, 16\n");
   printf("  # 返回a0值给系统调用\n");
   printf("  ret\n");
 }

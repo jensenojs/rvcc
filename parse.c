@@ -1,4 +1,5 @@
 #include "rvcc.h"
+#include <string.h>
 
 // during parsing, all variable instances are added to this list
 static Obj *Locals;
@@ -116,7 +117,8 @@ static Node *mul(Token **rest, Token *tok);
 // unary = ( "+" | "-" | "*" | "&") unary | primary
 static Node *unary(Token **rest, Token *tok);
 
-// primary = "(" expr ")" | num | ident(variable)
+// primary = "(" expr ")" | num | ident args?
+// args = "(" ")"
 static Node *primary(Token **rest, Token *tok);
 
 // =================================================================
@@ -460,6 +462,16 @@ Node *primary(Token **rest, Token *tok) {
   }
 
   if (tok->type == TK_IDENT) {
+
+    // function call
+    if (tokenCompare(tok->next, "(")) {
+      Node *node = newNode(ND_FUNCALL, tok);
+      node->funcName = strndup(tok->idx, tok->len);
+      *rest = tokenSkip(tok->next->next, ")");
+      return node;
+    }
+
+    // ident
     Obj *var = findVar(tok);
     if (!var)
       errorTok(tok, "undefined variable");

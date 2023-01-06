@@ -47,6 +47,7 @@ void addType(Node *node) {
   case ND_LT:
   case ND_LE:
   case ND_NUM:
+  case ND_FUNCALL:
     node->dataType = TyInt;
     return;
   case ND_VAR:

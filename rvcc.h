@@ -87,6 +87,7 @@ typedef enum {
 
   ND_EXPR_STMT, // Expression Statements
   ND_BLOCK,     // code block {}
+  ND_FUNCALL,   // function call
 } NodeType;
 
 // AST tree node
@@ -105,6 +106,8 @@ typedef struct Node {
   int val;  // store value for ND_NUM
   Obj *var; // store value for ND_VAR
 
+  char *funcName;
+  
   // if or for will use
   struct Node *cond; // condition
   struct Node *then; // then
