@@ -94,6 +94,16 @@ static bool isIdent1(char c) {
 // [a-zA-Z_]
 static bool isIdent2(char c) { return isIdent1(c) || ('0' <= c && c <= '9'); }
 
+// consume specific token, return true if exists, false otherwise
+bool tokenConsume(Token **rest, Token *tok, char *str) {
+  if (tokenCompare(tok, str)) {
+    *rest = tok->next;
+    return true;
+  }
+  *rest = tok;
+  return false;
+}
+
 static bool isKeyword(Token *tok) {
   static char *kws[] = {
     "return",
@@ -103,6 +113,7 @@ static bool isKeyword(Token *tok) {
     "while",
     "break",
     "continue",
+    "int",
   };
 
   for (int i = 0; i < sizeof(kws) / sizeof(*kws); i++)

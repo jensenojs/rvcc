@@ -4,9 +4,10 @@
 static Obj *Locals;
 
 // new a var
-static Obj *newLVar(char *name) {
+static Obj *newLVar(char *name, Type *dataType) {
   Obj *var = calloc(1, sizeof(Obj));
   var->name = name;
+  var->dataType = dataType;
   var->next = Locals;
   Locals = var;
   return var;
@@ -20,6 +21,13 @@ static Obj *findVar(Token *tok) {
     }
   }
   return NULL;
+}
+
+// get token ident
+static char *getIdent(Token *tok) {
+  if (tok->type != TK_IDENT)
+    errorTok(tok, "expected an identifier");
+  return strndup(tok->idx, tok->len);
 }
 
 /*
@@ -67,8 +75,14 @@ static Node *newBinary(NodeType type, Node *left, Node *right, Token *tok) {
 
 // program = "{" compoundStmt
 
-// compoundStmt = stmts * "}"
+// compoundStmt = (declaration | stmts)* "}"
 static Node *compoundStmt(Token **rest, Token *tok);
+
+// declaration =
+//   declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)* )? ";"
+// declspec = "int"
+// declarator = "*"* ident
+static Node *declaration(Token **rest, Token *tok);
 
 // stmt = "return" expr ";"
 //        | "if" "(" expr ")" stmt ("else" stmt)?
@@ -113,7 +127,10 @@ Node *compoundStmt(Token **rest, Token *tok) {
   Node *cur = &head;
 
   while (!tokenCompare(tok, "}")) {
-    cur->next = stmt(&tok, tok);
+    if (tokenCompare(tok, "int"))
+      cur->next = declaration(&tok, tok);
+    else
+      cur->next = stmt(&tok, tok);
     cur = cur->next;
     // after AST tree is done, add type info for node.
     addType(cur);
@@ -122,6 +139,61 @@ Node *compoundStmt(Token **rest, Token *tok) {
   block->body = head.next;
   *rest = tok->next;
   return block;
+}
+
+// declspec = "int", (declared base types)
+static Type *declspec(Token **rest, Token *tok) {
+  *rest = tokenSkip(tok, "int");
+  return TyInt;
+}
+
+// declarator specifier
+static Type *declarator(Token **rest, Token *tok, Type *dataType) {
+  // build (multiple) pointers
+  while (tokenConsume(&tok, tok, "*"))
+    dataType = pointerTo(dataType);
+
+  if (tok->type != TK_IDENT)
+    errorTok(tok, "expected a variable name");
+
+  dataType->name = tok;
+  *rest = tok->next;
+  return dataType;
+}
+
+Node *declaration(Token **rest, Token *tok) {
+  Type *basety = declspec(&tok, tok);
+
+  Node head = {};
+  Node *cur = &head;
+  int cnt = 0; // Counting the number of variable declarations
+
+  while (!tokenCompare(tok, ";")) {
+    if (cnt++ > 0) // the first variable declaration no need to match ','
+      tok = tokenSkip(tok, ",");
+
+    // declare the type of the fetched variable, including the variable name
+    Type *ty = declarator(&tok, tok, basety);
+    Obj *var = newLVar(getIdent(ty->name), ty);
+
+    // if not exists "=", no need to generate a node because it's already stored
+    // in the Locals
+    if (!tokenCompare(tok, "="))
+      continue;
+
+    // parse the token after "="
+    Node *left = newVarNode(var, ty->name);
+    Node *right = assign(&tok, tok->next);
+    Node *node = newBinary(ND_ASSIGN, left, right, tok);
+    cur->next = newUnary(ND_EXPR_STMT, node, tok);
+    cur = cur->next;
+  }
+
+  // store all expression statements in a codeblock
+  Node *node = newNode(ND_BLOCK, tok);
+  node->body = head.next;
+  *rest = tok->next;
+  return node;
 }
 
 Node *stmt(Token **rest, Token *tok) {
@@ -266,7 +338,7 @@ Node *relational(Token **rest, Token *tok) {
   return node;
 }
 
-// parse multiple types of add
+// helper function to parse multiple types of add
 static Node *newAdd(Node *left, Node *right, Token *tok) {
   addType(left);
   addType(right);
@@ -291,7 +363,7 @@ static Node *newAdd(Node *left, Node *right, Token *tok) {
   return newBinary(ND_ADD, left, right, tok);
 }
 
-// parse multiple types of sub
+// helper function to parse multiple types of sub
 static Node *newSub(Node *left, Node *right, Token *tok) {
   addType(left);
   addType(right);
@@ -390,7 +462,7 @@ Node *primary(Token **rest, Token *tok) {
   if (tok->type == TK_IDENT) {
     Obj *var = findVar(tok);
     if (!var)
-      var = newLVar(strndup(tok->idx, tok->len));
+      errorTok(tok, "undefined variable");
     *rest = tok->next;
     return newVarNode(var, tok);
   }

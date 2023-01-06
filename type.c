@@ -46,20 +46,21 @@ void addType(Node *node) {
   case ND_NE:
   case ND_LT:
   case ND_LE:
-  case ND_VAR:
   case ND_NUM:
     node->dataType = TyInt;
+    return;
+  case ND_VAR:
+    node->dataType = node->var->dataType;
     return;
   // set the dataType of the node to pointer to left child
   case ND_ADDR:
     node->dataType = pointerTo(node->left->dataType);
     return;
-  // If derefer is to pointer, then dataType is baseType, else int
+  // If derefer is to pointer, then dataType is baseType, else ERROR
   case ND_DEREF:
-    if (node->left->dataType->kind == TY_POINTER)
-      node->dataType = node->left->dataType->base;
-    else
-      node->dataType = TyInt;
+    if (node->left->dataType->kind != TY_POINTER)
+      errorTok(node->tok, "invalid pointer dereference");
+    node->dataType = node->left->dataType->base;
     return;
   default:
     break;

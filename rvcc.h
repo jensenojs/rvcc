@@ -28,20 +28,15 @@ typedef struct Token {
   int len;
 } Token;
 
+// token helper functions
 bool tokenCompare(Token const *tok, const char *expected);
 Token *tokenSkip(Token *tok, const char *expected);
+bool tokenConsume(Token **rest, Token *tok, char *str);
 
-// error
+// error helper functions
 void error(const char *fmt, ...);
 void errorAt(char *idx, char *fmt, ...);
 void errorTok(Token *tok, char *fmt, ...);
-
-// local variable
-typedef struct Obj {
-  struct Obj *next;
-  char *name;
-  int offSet; // the offset of fp
-} Obj;
 
 typedef enum {
   TY_INT,
@@ -51,7 +46,16 @@ typedef enum {
 typedef struct Type {
   TypeKind kind;
   struct Type *base;
+  Token *name;
 } Type;
+
+// local variable
+typedef struct Obj {
+  struct Obj *next;
+  char *name;
+  Type *dataType;
+  int offSet; // the offset of fp
+} Obj;
 
 // define in type.c
 extern Type *TyInt;
@@ -88,7 +92,7 @@ typedef enum {
 // AST tree node
 typedef struct Node {
   NodeType nodeType;
-  Type *dataType;    // the data type in the node
+  Type *dataType; // the data type in the node
 
   struct Node *next; // Referring to the next statement
   Token *tok;        // reference to the token
@@ -118,6 +122,17 @@ typedef struct Function {
   int stackSize;
 } Function;
 
+// judge if is int
+bool isInteger(Type *ty);
+
+// all nodes within a node add type
+void addType(Node *Nd);
+
+// builds a pointer type and points to the base class
+Type *pointerTo(Type *base);
+
+// =================================================================
+
 // Syntax parsing entry
 Token *tokenize();
 
@@ -126,9 +141,3 @@ Function *parse(Token *Tok);
 
 // Code Generation entry
 void codegen(Function *prog);
-
-// judge if is int
-bool isInteger(Type *ty);
-
-// all nodes within a node add type
-void addType(Node *Nd);
