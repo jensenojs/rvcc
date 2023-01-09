@@ -86,7 +86,7 @@ static Function *function(Token **rest, Token *tok);
 // declspec = "int", (declared base types)
 static Type *declspec(Token **rest, Token *tok);
 
-// typeSuffix = ( "(" ")" ) ?
+// typeSuffix = ("(" funcParams? ")")?
 static Type *typeSuffix(Token **rest, Token *tok, Type *type);
 
 // declarator = "*"* ident typeSuffix
@@ -146,9 +146,26 @@ static Type *declspec(Token **rest, Token *tok) {
 }
 
 static Type *typeSuffix(Token **rest, Token *tok, Type *type) {
+  // ("(" funcParams? ")")?
   if (tokenCompare(tok, "(")) {
-    *rest = tokenSkip(tok->next, ")");
-    return funcType(type);
+    tok = tok->next;
+
+    Type head = {};
+    Type *cur = &head;
+    while (!tokenCompare(tok, ")")) {
+      // funcParams = param ("," param) *
+      if (cur != &head)
+        tok = tokenSkip(tok, ",");
+      // param = declspec declarator
+      Type *baseTy = declspec(&tok, tok);
+      Type *declarTy = declarator(&tok, tok, baseTy);
+      cur->next = copyType(declarTy);
+      cur = cur->next;
+    }
+    type = funcType(type);
+    type->params = head.next;
+    *rest = tok->next;
+    return type;
   }
   *rest = tok;
   return type;
@@ -535,6 +552,14 @@ Node *funCall(Token **rest, Token *tok) {
 
 // ===================================================================
 
+static void createParamVars(Type *param) {
+  if (param) {
+    // recursive to the bottom of the form parameter
+    createParamVars(param->next);
+    newLVar(getIdent(param->name), param);
+  }
+}
+
 // functionDefinition = declspec declarator "(" ")" "{" compoundStmt*
 static Function *function(Token **rest, Token *tok) {
   // declspec
@@ -548,6 +573,8 @@ static Function *function(Token **rest, Token *tok) {
   // parse ident from type
   Function *fn = calloc(1, sizeof(Function));
   tok = tokenSkip(tok, "{");
+  createParamVars(type->params);
+  fn->params = Locals;
   fn->name = getIdent(type->name);
   fn->body = compoundStmt(rest, tok);
   fn->locals = Locals;

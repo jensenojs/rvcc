@@ -46,9 +46,11 @@ typedef enum {
 
 typedef struct Type {
   TypeKind kind;
-  Token *name;
+  Token *name; // Type corresponding name, such as: variable name, function name
   struct Type *base;
   struct Type *returnType; // function return type
+  struct Type *params;     // parameters for defined function
+  struct Type *next;
 } Type;
 
 // local variable
@@ -125,21 +127,25 @@ typedef struct Node {
 typedef struct Function {
   struct Function *next; // next function
   char *name;            // function name
-  Node *body;            // function body
-  Obj *locals;           // local variables
-  int stackSize;         // stack size
+  Obj *params;           // parameters for defined function
+
+  Node *body;    // function body
+  Obj *locals;   // local variables
+  int stackSize; // stack size
 } Function;
 
 // judge if is int
 bool isInteger(Type *ty);
 
-// all nodes within a node add type
-void addType(Node *Nd);
+// builds a pointer type and points to the base class
+Type *pointerTo(Type *base);
 
 Type *funcType(Type *returnType);
 
-// builds a pointer type and points to the base class
-Type *pointerTo(Type *base);
+// all nodes within a node add type
+void addType(Node *Nd);
+
+Type *copyType(Type *type);
 
 // =================================================================
 

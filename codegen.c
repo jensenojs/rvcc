@@ -330,6 +330,12 @@ void codegen(Function *prog) {
     printf("  # sp腾出StackSize大小的栈空间\n");
     printf("  addi sp, sp, -%d\n", fn->stackSize);
 
+    int i = 0;
+    for (Obj *var = fn->params; var; var = var->next) {
+      printf("  # 将%s寄存器的值存入%s的栈地址\n", ArgReg[i], var->name);
+      printf("  sd %s, %d(fp)\n", ArgReg[i++], var->offSet);
+    }
+
     printf("\n# ===============%s段主体===============\n", fn->name);
     genStmt(fn->body);
     assert(StackDepth == 0);

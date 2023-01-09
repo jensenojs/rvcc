@@ -36,7 +36,10 @@ void addType(Node *node) {
   addType(node->init);
   addType(node->inc);
 
+  // Access all nodes and args in the linked-list to increase the type
   for (Node *n = node->body; n; n = n->next)
+    addType(n);
+  for (Node *n = node->args; n; n = n->next)
     addType(n);
 
   switch (node->nodeType) {
@@ -74,4 +77,10 @@ void addType(Node *node) {
   default:
     break;
   }
+}
+
+Type *copyType(Type *Ty) {
+  Type *Ret = calloc(1, sizeof(Type));
+  *Ret = *Ty;
+  return Ret;
 }
