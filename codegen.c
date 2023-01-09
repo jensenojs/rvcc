@@ -3,9 +3,10 @@
  */
 
 #include "rvcc.h"
-#include <stdio.h>
 
 static int StackDepth;
+// 用于函数参数的寄存器们
+static char *ArgReg[] = {"a0", "a1", "a2", "a3", "a4", "a5"};
 
 static void genExpr(Node *node);
 
@@ -96,10 +97,27 @@ static void genExpr(Node *node) {
   case ND_ADDR:
     genAddr(node->left);
     return;
-  case ND_FUNCALL:
+  case ND_FUNCALL: {
+    int nargs = 0;
+
+    // Calculate the values of all parameters and push to stack
+    for (Node *arg = node->args; arg; arg = arg->next) {
+      genExpr(arg);
+      push();
+      nargs++;
+    }
+
+    assert(nargs <= 6); // up to 6 registers to store the parameters of the function
+    
+    // pop the arguments to register, a0 -> args1, a1 -> args2 and so on
+    for (int i = nargs - 1; i >= 0; i--) {
+      pop(ArgReg[i]);
+    }
+
     printf("\n  # 调用函数%s\n", node->funcName);
     printf("  call %s\n", node->funcName);
     return;
+  }
   default:
     break;
   }

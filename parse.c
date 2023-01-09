@@ -117,9 +117,12 @@ static Node *mul(Token **rest, Token *tok);
 // unary = ( "+" | "-" | "*" | "&") unary | primary
 static Node *unary(Token **rest, Token *tok);
 
-// primary = "(" expr ")" | num | ident args?
-// args = "(" ")"
+// primary = "(" expr ")" | num | ident func-args?
+// func-args = "(" ")"
 static Node *primary(Token **rest, Token *tok);
+
+// funCall = ident "(" ( assign("," assign)* )? ")"
+static Node *funCall(Token **rest, Token *tok);
 
 // =================================================================
 
@@ -464,12 +467,8 @@ Node *primary(Token **rest, Token *tok) {
   if (tok->type == TK_IDENT) {
 
     // function call
-    if (tokenCompare(tok->next, "(")) {
-      Node *node = newNode(ND_FUNCALL, tok);
-      node->funcName = strndup(tok->idx, tok->len);
-      *rest = tokenSkip(tok->next->next, ")");
-      return node;
-    }
+    if (tokenCompare(tok->next, "(")) 
+      return funCall(rest, tok);
 
     // ident
     Obj *var = findVar(tok);
@@ -487,6 +486,28 @@ Node *primary(Token **rest, Token *tok) {
 
   errorTok(tok, "invalid expression");
   return NULL;
+}
+
+Node *funCall(Token **rest, Token *tok) {
+  Token *start = tok;
+  tok = tok->next->next;
+
+  Node head = {};
+  Node *cur = &head;
+
+  while (!tokenCompare(tok, ")")) {
+    if (cur != &head) 
+      tok = tokenSkip(tok, ",");
+    cur->next = assign(&tok, tok); 
+    cur = cur->next;
+  }
+
+  *rest = tokenSkip(tok, ")");
+
+  Node *node = newNode(ND_FUNCALL, start);
+  node->funcName = strndup(start->idx, start->len);
+  node->args = head.next;
+  return node;
 }
 
 Function *parse(Token *tok) {

@@ -107,6 +107,7 @@ typedef struct Node {
   Obj *var; // store value for ND_VAR
 
   char *funcName;
+  struct Node *args; // function arguments
   
   // if or for will use
   struct Node *cond; // condition
