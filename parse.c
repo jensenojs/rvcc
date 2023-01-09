@@ -1,4 +1,5 @@
 #include "rvcc.h"
+#include <stdlib.h>
 #include <string.h>
 
 // during parsing, all variable instances are added to this list
@@ -71,19 +72,32 @@ static Node *newBinary(NodeType type, Node *left, Node *right, Token *tok) {
   return node;
 }
 
+// =======================================================================
+
 // Each function represents a generating rule
 // The higher the priority the execution rule is the lower in the AST tree.
 
-// program = "{" compoundStmt
+// program = functionDefinition*
+Function *parse(Token *tok);
 
-// compoundStmt = (declaration | stmts)* "}"
-static Node *compoundStmt(Token **rest, Token *tok);
+// functionDefinition = declspec declarator "(" ")" "{" compoundStmt *
+static Function *function(Token **rest, Token *tok);
+
+// declspec = "int", (declared base types)
+static Type *declspec(Token **rest, Token *tok);
+
+// typeSuffix = ( "(" ")" ) ?
+static Type *typeSuffix(Token **rest, Token *tok, Type *type);
+
+// declarator = "*"* ident typeSuffix
+static Type *declarator(Token **rest, Token *tok, Type *dataType);
 
 // declaration =
 //   declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)* )? ";"
-// declspec = "int"
-// declarator = "*"* ident
 static Node *declaration(Token **rest, Token *tok);
+
+// compoundStmt = (declaration | stmts)* "}"
+static Node *compoundStmt(Token **rest, Token *tok);
 
 // stmt = "return" expr ";"
 //        | "if" "(" expr ")" stmt ("else" stmt)?
@@ -126,44 +140,33 @@ static Node *funCall(Token **rest, Token *tok);
 
 // =================================================================
 
-Node *compoundStmt(Token **rest, Token *tok) {
-  Node *block = newNode(ND_BLOCK, tok);
-  Node head = {};
-  Node *cur = &head;
-
-  while (!tokenCompare(tok, "}")) {
-    if (tokenCompare(tok, "int"))
-      cur->next = declaration(&tok, tok);
-    else
-      cur->next = stmt(&tok, tok);
-    cur = cur->next;
-    // after AST tree is done, add type info for node.
-    addType(cur);
-  }
-
-  block->body = head.next;
-  *rest = tok->next;
-  return block;
-}
-
-// declspec = "int", (declared base types)
 static Type *declspec(Token **rest, Token *tok) {
   *rest = tokenSkip(tok, "int");
   return TyInt;
 }
 
-// declarator specifier
-static Type *declarator(Token **rest, Token *tok, Type *dataType) {
+static Type *typeSuffix(Token **rest, Token *tok, Type *type) {
+  if (tokenCompare(tok, "(")) {
+    *rest = tokenSkip(tok->next, ")");
+    return funcType(type);
+  }
+  *rest = tok;
+  return type;
+}
+
+static Type *declarator(Token **rest, Token *tok, Type *type) {
   // build (multiple) pointers
   while (tokenConsume(&tok, tok, "*"))
-    dataType = pointerTo(dataType);
+    type = pointerTo(type);
 
   if (tok->type != TK_IDENT)
     errorTok(tok, "expected a variable name");
 
-  dataType->name = tok;
-  *rest = tok->next;
-  return dataType;
+  // typeSuffix
+  type = typeSuffix(rest, tok->next, type);
+
+  type->name = tok; // variable name or function name
+  return type;
 }
 
 Node *declaration(Token **rest, Token *tok) {
@@ -199,6 +202,26 @@ Node *declaration(Token **rest, Token *tok) {
   node->body = head.next;
   *rest = tok->next;
   return node;
+}
+
+Node *compoundStmt(Token **rest, Token *tok) {
+  Node *block = newNode(ND_BLOCK, tok);
+  Node head = {};
+  Node *cur = &head;
+
+  while (!tokenCompare(tok, "}")) {
+    if (tokenCompare(tok, "int"))
+      cur->next = declaration(&tok, tok);
+    else
+      cur->next = stmt(&tok, tok);
+    cur = cur->next;
+    // after AST tree is done, add type info for node.
+    addType(cur);
+  }
+
+  block->body = head.next;
+  *rest = tok->next;
+  return block;
 }
 
 Node *stmt(Token **rest, Token *tok) {
@@ -467,7 +490,7 @@ Node *primary(Token **rest, Token *tok) {
   if (tok->type == TK_IDENT) {
 
     // function call
-    if (tokenCompare(tok->next, "(")) 
+    if (tokenCompare(tok->next, "("))
       return funCall(rest, tok);
 
     // ident
@@ -496,9 +519,9 @@ Node *funCall(Token **rest, Token *tok) {
   Node *cur = &head;
 
   while (!tokenCompare(tok, ")")) {
-    if (cur != &head) 
+    if (cur != &head)
       tok = tokenSkip(tok, ",");
-    cur->next = assign(&tok, tok); 
+    cur->next = assign(&tok, tok);
     cur = cur->next;
   }
 
@@ -510,14 +533,35 @@ Node *funCall(Token **rest, Token *tok) {
   return node;
 }
 
-Function *parse(Token *tok) {
+// ===================================================================
+
+// functionDefinition = declspec declarator "(" ")" "{" compoundStmt*
+static Function *function(Token **rest, Token *tok) {
+  // declspec
+  Type *type = declspec(&tok, tok);
+
+  // declarator ? ident "(" ")"
+  type = declarator(&tok, tok, type);
+
+  Locals = NULL;
+
+  // parse ident from type
+  Function *fn = calloc(1, sizeof(Function));
   tok = tokenSkip(tok, "{");
+  fn->name = getIdent(type->name);
+  fn->body = compoundStmt(rest, tok);
+  fn->locals = Locals;
+  return fn;
+}
 
-  // The function body stores the AST of the statement, and Locals stores the
-  // variables
-  Function *program = calloc(1, sizeof(Function));
-  program->body = compoundStmt(&tok, tok);
-  program->locals = Locals;
+// program = functionDefinition *
+Function *parse(Token *tok) {
+  Function head = {};
+  Function *cur = &head;
 
-  return program;
+  while (tok->type != TK_EOF) {
+    cur = cur->next = function(&tok, tok);
+  }
+
+  return head.next;
 }

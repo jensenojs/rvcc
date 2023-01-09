@@ -7,6 +7,7 @@
 static int StackDepth;
 // 用于函数参数的寄存器们
 static char *ArgReg[] = {"a0", "a1", "a2", "a3", "a4", "a5"};
+static Function *CurrentFn;
 
 static void genExpr(Node *node);
 
@@ -107,8 +108,9 @@ static void genExpr(Node *node) {
       nargs++;
     }
 
-    assert(nargs <= 6); // up to 6 registers to store the parameters of the function
-    
+    assert(nargs <=
+           6); // up to 6 registers to store the parameters of the function
+
     // pop the arguments to register, a0 -> args1, a1 -> args2 and so on
     for (int i = nargs - 1; i >= 0; i--) {
       pop(ArgReg[i]);
@@ -189,8 +191,8 @@ static void genStmt(Node *node) {
     genExpr(node->left);
     // no condition jumps : jumps to .L.return segement
     // the way represent "j offset" is jal x0.
-    printf("  # 跳转到.L.return段\n");
-    printf("  j .L.return\n");
+    printf("  # 跳转到.L.return.%s段\n", CurrentFn->name);
+    printf("  j .L.return.%s\n", CurrentFn->name);
     return;
   case ND_EXPR_STMT:
     genExpr(node->left);
@@ -273,11 +275,17 @@ static void genStmt(Node *node) {
 
 // Calculate the offset from the variable's linked list
 static void assignLVarOffset(Function *prog) {
-  int offset = 0;
-  for (Obj *var = prog->locals; var; var = var->next) {
-    offset += 8;
-    var->offSet = -offset;
-    prog->stackSize = alighTo(offset, 16); //
+  // Calculate the stack space used by its variables for each function
+  for (Function *fn = prog; fn; fn = fn->next) {
+    int offSet = 0;
+
+    // fetch all the variables
+    for (Obj *var = fn->locals; var; var = var->next) {
+      offSet += 8;
+      var->offSet = -offSet;
+    }
+
+    fn->stackSize = alighTo(offSet, 16);
   }
 }
 
@@ -286,59 +294,64 @@ static void assignLVarOffset(Function *prog) {
 // block
 void codegen(Function *prog) {
   assignLVarOffset(prog);
-  printf("  # 定义全局main段\n");
-  printf("  .global main\n");
-  printf("\n# ===============程序开始===============\n");
-  printf("# main段标签, 也是程序入口段\n");
-  printf("main:\n");
-  // stack layout
-  //-------------------------------// sp
-  //              ra
-  //-------------------------------// ra = sp-8
-  //              fp
-  //-------------------------------// fp = sp-16
-  //           variable            //
-  //-------------------------------// sp = sp-16-StackSize
-  //     Expression evaluation
-  //-------------------------------//
 
-  // prologue
+  // Generate separate code for each function
+  for (Function *fn = prog; fn; fn = fn->next) {
+    printf("  # 定义全局%s段\n", fn->name);
+    printf("  .global %s\n", fn->name);
+    printf("\n# ===============%s程序开始===============\n", fn->name);
+    printf("# %s段标签, 也是程序入口段\n", fn->name);
+    printf("%s:\n", fn->name);
+    CurrentFn = fn;
+    // stack layout
+    //-------------------------------// sp
+    //              ra
+    //-------------------------------// ra = sp-8
+    //              fp
+    //-------------------------------// fp = sp-16
+    //           variable            //
+    //-------------------------------// sp = sp-16-StackSize
+    //     Expression evaluation
+    //-------------------------------//
 
-  // 将ra寄存器压栈,保存ra的值
-  printf("  # 将ra寄存器压栈,保存ra的值, ra寄存器保存的是返回地址\n");
-  printf("  addi sp, sp, -16\n");
-  printf("  sd ra, 8(sp)\n");
-  printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值\n");
-  printf("  sd fp, 0(sp)\n");
-  // write sp to fp
-  printf("  # 将sp的值写入fp\n");
-  printf("  mv fp, sp\n");
+    // prologue
 
-  // the offset is the size of the stack used by the actual variable
-  printf("  # sp腾出StackSize大小的栈空间\n");
-  printf("  addi sp, sp, -%d\n", prog->stackSize);
+    // 将ra寄存器压栈,保存ra的值
+    printf("  # 将ra寄存器压栈,保存ra的值, ra寄存器保存的是返回地址\n");
+    printf("  addi sp, sp, -16\n");
+    printf("  sd ra, 8(sp)\n");
+    printf("  # 将fp压栈, fp属于“被调用者保存”的寄存器, 需要恢复原值\n");
+    printf("  sd fp, 0(sp)\n");
+    // write sp to fp
+    printf("  # 将sp的值写入fp\n");
+    printf("  mv fp, sp\n");
 
-  printf("\n# ===============程序主体===============\n");
-  genStmt(prog->body);
-  assert(StackDepth == 0);
+    // the offset is the size of the stack used by the actual variable
+    printf("  # sp腾出StackSize大小的栈空间\n");
+    printf("  addi sp, sp, -%d\n", fn->stackSize);
 
-  // epilogue
+    printf("\n# ===============%s段主体===============\n", fn->name);
+    genStmt(fn->body);
+    assert(StackDepth == 0);
 
-  // return segment tag
-  printf("\n# ===============程序结束===============\n");
-  printf("# return段标签\n");
-  printf(".L.return:\n");
+    // epilogue
 
-  // write fp to sp
-  printf("  # 将fp的值写回sp\n");
-  printf("  mv sp, fp\n");
-  // pop the stack of the earliest fp saved values and restore fp.
-  printf("  # 将最早fp保存的值弹栈, 恢复fp和sp\n");
-  printf("  ld fp, 0(sp)\n");
-  // 将ra寄存器弹栈,恢复ra的值
-  printf("  # 将ra寄存器弹栈,恢复ra的值\n");
-  printf("  ld ra, 8(sp)\n");
-  printf("  addi sp, sp, 16\n");
-  printf("  # 返回a0值给系统调用\n");
-  printf("  ret\n");
+    // return segment tag
+    printf("\n# ===============%s段结束===============\n", fn->name);
+    printf("# return段标签\n");
+    printf(".L.return.%s:\n", fn->name);
+
+    // write fp to sp
+    printf("  # 将fp的值写回sp\n");
+    printf("  mv sp, fp\n");
+    // pop the stack of the earliest fp saved values and restore fp.
+    printf("  # 将最早fp保存的值弹栈, 恢复fp和sp\n");
+    printf("  ld fp, 0(sp)\n");
+    // 将ra寄存器弹栈,恢复ra的值
+    printf("  # 将ra寄存器弹栈,恢复ra的值\n");
+    printf("  ld ra, 8(sp)\n");
+    printf("  addi sp, sp, 16\n");
+    printf("  # 返回a0值给系统调用\n");
+    printf("  ret\n");
+  }
 }

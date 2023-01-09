@@ -41,12 +41,14 @@ void errorTok(Token *tok, char *fmt, ...);
 typedef enum {
   TY_INT,
   TY_POINTER,
+  TY_FUNCTION,
 } TypeKind;
 
 typedef struct Type {
   TypeKind kind;
-  struct Type *base;
   Token *name;
+  struct Type *base;
+  struct Type *returnType; // function return type
 } Type;
 
 // local variable
@@ -108,7 +110,7 @@ typedef struct Node {
 
   char *funcName;
   struct Node *args; // function arguments
-  
+
   // if or for will use
   struct Node *cond; // condition
   struct Node *then; // then
@@ -121,9 +123,11 @@ typedef struct Node {
 
 // function
 typedef struct Function {
-  Node *body;
-  Obj *locals;
-  int stackSize;
+  struct Function *next; // next function
+  char *name;            // function name
+  Node *body;            // function body
+  Obj *locals;           // local variables
+  int stackSize;         // stack size
 } Function;
 
 // judge if is int
@@ -131,6 +135,8 @@ bool isInteger(Type *ty);
 
 // all nodes within a node add type
 void addType(Node *Nd);
+
+Type *funcType(Type *returnType);
 
 // builds a pointer type and points to the base class
 Type *pointerTo(Type *base);

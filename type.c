@@ -1,5 +1,6 @@
 #include "rvcc.h"
 #include <assert.h>
+#include <stdlib.h>
 
 Type *TyInt = &(Type){TY_INT};
 
@@ -13,6 +14,13 @@ Type *pointerTo(Type *base) {
   Type *ty = calloc(1, sizeof(Type));
   ty->kind = TY_POINTER;
   ty->base = base;
+  return ty;
+}
+
+Type *funcType(Type *returnType) {
+  Type *ty = calloc(1, sizeof(Type));
+  ty->kind = TY_FUNCTION;
+  ty->returnType = returnType;
   return ty;
 }
 
